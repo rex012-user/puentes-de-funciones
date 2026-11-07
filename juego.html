@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Function Bridge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Saira+Stencil+One&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="hazard"></div>
+<div id="app">
+  <section id="s-menu"></section>
+  <section id="s-game" hidden>
+    <div class="bar">
+      <button class="btn small" id="back-map" type="button">Obras</button>
+      <div class="where"><small id="g-where"></small><strong id="g-name"></strong></div>
+      <ol class="steps" id="g-steps"><li>Reconoce</li><li>Construye</li><li>Prueba</li></ol>
+      <button class="btn small" id="open-guide" type="button">Guía</button>
+      <button class="btn small" id="toggle-sound" type="button" aria-label="Sonido activado">♪ sí</button>
+    </div>
+    <div class="game">
+      <div class="stage" id="stage" aria-label="Escena del puente en un plano cartesiano"><div class="hud" id="hud" hidden></div></div>
+      <div class="panel" id="panel" aria-live="polite"></div>
+    </div>
+  </section>
+  <section id="s-exam" class="page" hidden></section>
+  <section id="s-guide" class="page" hidden></section>
+  <section id="s-report" class="page" hidden></section>
+</div>
+<!-- Librerías: primero el CDN (versión fija); si no carga, la copia local de lib/ para presentar sin internet. -->
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+<script>window.p5||document.write('<script src="lib/p5.min.js"><\/script>')</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjs@12.4.3/lib/browser/math.js"></script>
+<script>window.math||document.write('<script src="lib/math.js"><\/script>')</script>
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+<script>window.Matter||document.write('<script src="lib/matter.min.js"><\/script>')</script>
+<script src="game.js"></script>
+</body>
+</html>

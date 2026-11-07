@@ -1362,7 +1362,7 @@ function renderMenu(){
        <button class="btn" id="go-exam" type="button">Examen del inspector</button>
        <button class="btn" id="go-guide" type="button">Guía de funciones</button>
        <button class="btn" id="go-report" type="button">Informe de obra</button>
-       <a class="btn" href="menu.html">Menú principal</a>
+       <a class="btn" href="index.html">Menú principal</a>
      </div>
    </div>
    <div class="section-head"><h2>Obras</h2>
