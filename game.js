@@ -944,7 +944,8 @@ function stepSim(dt){
     const v=2.7*(1-.32*Math.min(m/2,1));s.tx+=v*dt;s.spin+=v*dt/.15;
     if(s.issue&&s.tx+.55>=s.issue.x)crash(s);
     else if(s.tx>L.xR&&!s.wobT){s.wobT=s.t}
-    if(s.state==='run'&&s.tx>L.xR+1.35){s.state='win';s.winT=s.t;onWin()}
+    /* La demo del menú también usa esta simulación: solo una obra jugada da estrellas, sonido y panel. */
+    if(s.state==='run'&&s.tx>L.xR+1.35){s.state='win';s.winT=s.t;if(S.screen==='game')onWin()}
   }else if(s.state==='crash'){
     const T=s.t-s.crashT;
     s.pieces.forEach(q=>{if(q.keep||T<q.delay)return;q.vy-=9*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.a+=q.w*dt;
@@ -953,7 +954,7 @@ function stepSim(dt){
     const b=s.body;if(b){b.vy-=9*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.a+=b.w*dt;
       if(b.y<WATER&&!b.splashed){b.splashed=true;splash(b.x,28);b.vy*=.2;b.vx*=.2;b.w*=.2}
       if(b.y<WATER)b.vy=Math.max(b.vy,-.8)}
-    if(!s.reported&&T>2){s.reported=true;onFail()}
+    if(!s.reported&&T>2){s.reported=true;if(S.screen==='game')onFail()}
   }else if(s.state==='win'){s.flag=Math.min(1,s.flag+dt*1.2)}
   s.parts.forEach(p=>{p.vy-=p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt});
   s.parts=s.parts.filter(p=>p.life>0);
