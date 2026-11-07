@@ -671,7 +671,8 @@ const KEY='puentes-funciones-v1';
 let P={name:'',levels:{},examBest:null,unlockAll:false,sound:true};
 try{const raw=localStorage.getItem(KEY);if(raw)P={...P,...JSON.parse(raw)}}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(P))}catch(e){}};
-const unlocked=L=>L.n===1||P.unlockAll||!!(P.levels[LEVELS[L.n-2].id]&&P.levels[LEVELS[L.n-2].id].stars);
+/* Una obra se abre solo cuando todas las anteriores tienen al menos una estrella (o con el desbloqueo docente). */
+const unlocked=L=>P.unlockAll||LEVELS.slice(0,L.n-1).every(A=>P.levels[A.id]&&P.levels[A.id].stars);
 const stars=n=>`<span class="stars" aria-label="${n} de 3 estrellas">${'★'.repeat(n)}<i>${'★'.repeat(3-n)}</i></span>`;
 
 /* ---------- sonido ---------- */
