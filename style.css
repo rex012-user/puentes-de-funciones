@@ -184,6 +184,10 @@ textarea{width:100%;min-height:150px;background:var(--sheet);border:1px solid va
 .fx-msg{min-height:1.4em;font-size:.92rem}
 .fx-msg.bad{color:var(--bad)}
 .fx-msg.good{color:var(--ok)}
+.fx input.warn{border-color:var(--warn)}
+.fx-msg.warn{color:var(--warn)}
+.fx-px{display:flex;gap:.5em;align-items:flex-start;font-size:.9rem;color:var(--muted);cursor:pointer}
+.fx-px input{width:auto;margin-top:.25em;accent-color:var(--tape)}
 /* Panel de análisis y resonancia */
 .analysis{border:1px solid var(--rule);background:rgba(12,40,69,.55)}
 .analysis summary{padding:.5em .75em;font-weight:700;cursor:pointer}

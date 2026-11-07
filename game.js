@@ -45,7 +45,8 @@ function fxTokens(texto){
   }
   return out;
 }
-function compilarFuncion(texto){
+/* Parser propio (versión anterior). Ya no es el principal: solo se usa si Math.js no cargó. */
+function compilarFuncionPropia(texto){
   if(!texto||!texto.trim())throw new Error('Escribe una función de x.');
   if(texto.length>200)throw new Error('La fórmula es demasiado larga.');
   const T=fxTokens(texto);let i=0,absOpen=0;
@@ -107,6 +108,116 @@ function compilarFuncion(texto){
   if(i<T.length)throw new Error(T[i].t===')'?'Sobra un paréntesis de cierre.':`No esperaba “${T[i].v??T[i].t}” en esa posición.`);
   return x=>{const y=f(x);return Number.isFinite(y)?y:NaN};
 }
+
+/* ---------- motor algebraico: Math.js ----------
+   compilarFuncion(texto) → función x ↦ y (número real, o NaN donde no existe).
+   1. Normaliza lo que escribe el jugador (tildes, π, √, ², coma decimal, |x|).
+   2. math.parse construye el árbol de la expresión.
+   3. Se traducen los alias en español (sen, senh, raiz, ln, log) y se revisa que
+      solo aparezcan x, pi, e, operadores aritméticos y funciones permitidas.
+   4. math.compile(...).evaluate({x}) evalúa la función en cada punto. */
+const MJ=window.math?window.math.create(window.math.all,{predictable:true}):null;
+/* alias del jugador → nombre en Math.js. ln es el logaritmo natural y log es base 10. */
+const FX_ALIAS={sen:'sin',senh:'sinh',raiz:'sqrt',ln:'log',log:'log10',tg:'tan',arcsen:'asin',arccos:'acos',arctan:'atan'};
+const FX_OK=new Set(['sin','cos','tan','asin','acos','atan','sinh','cosh','tanh','sqrt','cbrt','abs','log','log10','log2','exp']);
+const FX_OPS=new Set(['add','subtract','multiply','divide','pow','unaryMinus','unaryPlus']);
+const FX_VARS=new Set(['x','pi','e']);
+/* Las barras |…| no existen en Math.js: se cambian por abs(…). Una barra abre si va al inicio,
+   después de un operador o de un paréntesis que abre; si no, cierra. */
+function barrasAbs(s){
+  let out='',stack=0,prev='';
+  for(const c of s){
+    if(c==='|'){
+      const opens=prev===''||'+-*/^(,'.includes(prev)||prev==='|open';
+      if(opens||stack===0){if(prev&&!('+-*/^(,'.includes(prev)||prev==='|open'))out+='*';out+='abs(';stack++;prev='|open'}
+      else{out+=')';stack--;prev=')'}
+      continue;
+    }
+    out+=c;if(!/\s/.test(c))prev=c;
+  }
+  if(stack)throw new Error('Falta cerrar el valor absoluto con otra barra |.');
+  return out;
+}
+function normalizarFormula(texto){
+  let s=texto.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
+    .replace(/[−–—]/g,'-').replace(/[·×]/g,'*').replace(/÷/g,'/').replace(/²/g,'^2').replace(/³/g,'^3')
+    .replace(/π/g,' pi ').replace(/√\s*\(/g,'sqrt(').replace(/√\s*(\d+\.?\d*|x)/g,'sqrt($1)').replace(/(\d),(\d)/g,'$1.$2');
+  if(/[^a-z0-9.\s+\-*/^()|]/.test(s)){const c=s.match(/[^a-z0-9.\s+\-*/^()|]/)[0];throw new Error(`No entiendo el símbolo “${c}”.`)}
+  return barrasAbs(s);
+}
+/* Traduce al español los errores de sintaxis de Math.js. */
+function errorSintaxis(e){
+  const m=String(e.message||''),pos=(m.match(/\(char (\d+)\)/)||[])[1],donde=pos?` (posición ${pos})`:'';
+  if(/Parenthesis \) expected/.test(m))return'Falta cerrar un paréntesis.';
+  if(/Unexpected end of expression/.test(m))return'La fórmula termina antes de tiempo: falta un número o una x.';
+  if(/Value expected/.test(m))return`Falta un número o una x${donde}.`;
+  if(/Unexpected operator \)/.test(m))return`Sobra un paréntesis de cierre${donde}.`;
+  if(/Unexpected operator (\S+)/.test(m))return`No esperaba el operador “${m.match(/Unexpected operator (\S+)/)[1]}”${donde}.`;
+  if(/Unexpected part "([^"]*)"/.test(m))return`No entiendo “${m.match(/Unexpected part "([^"]*)"/)[1]}”${donde}. Revisa los puntos decimales.`;
+  return`La fórmula tiene un error de escritura${donde}.`;
+}
+function compilarFuncion(texto){
+  if(!MJ)return compilarFuncionPropia(texto);
+  if(!texto||!texto.trim())throw new Error('Escribe una función de x.');
+  if(texto.length>200)throw new Error('La fórmula es demasiado larga.');
+  let node;
+  try{node=MJ.parse(normalizarFormula(texto))}
+  catch(e){if(e instanceof SyntaxError&&/char|expected|Unexpected/.test(e.message))throw new Error(errorSintaxis(e));throw e}
+  /* transform no recorre el interior de un nodo reemplazado: por eso los argumentos se transforman aquí mismo */
+  const alias=n=>{
+    if(n.type!=='FunctionNode'||n.fn.type!=='SymbolNode')return n;
+    const name=n.fn.name,args=n.args.map(a=>a.transform(alias));
+    /* x(x+1) o pi(x) son multiplicaciones, no llamadas a función */
+    if(FX_VARS.has(name)&&args.length===1)return new MJ.OperatorNode('*','multiply',[new MJ.SymbolNode(name),args[0]],true);
+    return new MJ.FunctionNode(new MJ.SymbolNode(Object.hasOwn(FX_ALIAS,name)?FX_ALIAS[name]:name),args);
+  };
+  node=node.transform(alias);
+  /* solo números, x, pi, e, operadores aritméticos y funciones de la lista */
+  node.traverse((n,path,parent)=>{
+    switch(n.type){
+      case'ParenthesisNode':break;
+      case'ConstantNode':if(typeof n.value!=='number')throw new Error('Solo se aceptan números en la fórmula.');break;
+      case'SymbolNode':
+        if(parent&&parent.type==='FunctionNode'&&path==='fn')break;
+        if(FX_VARS.has(n.name))break;
+        if(FX_OK.has(n.name)||Object.hasOwn(FX_ALIAS,n.name)||Object.values(FX_ALIAS).includes(n.name))throw new Error(`Después de ${n.name} van paréntesis, por ejemplo ${n.name}(x).`);
+        throw new Error(`No conozco “${n.name}”. La única variable es x; si es una multiplicación, escríbela con *.`);
+      case'FunctionNode':{
+        const name=n.fn.name;
+        if(!FX_OK.has(name))throw new Error(`No conozco la función “${name}”. Usa sen, cos, tan, raiz, abs, ln, log, exp…`);
+        if(n.args.length!==1)throw new Error(`${name}( ) necesita exactamente un valor adentro, por ejemplo ${name}(x).`);
+        break;
+      }
+      case'OperatorNode':if(!FX_OPS.has(n.fn))throw new Error(n.fn==='factorial'?'El factorial ! no se usa en los puentes.':`No se puede usar “${n.op}” en una función del puente.`);break;
+      default:throw new Error('Esa expresión no es una función de x. Escribe algo como 2*x + 1.');
+    }
+  });
+  const code=node.compile(),scope={x:0};
+  /* Cualquier resultado que no sea un número real (complejo, infinito, error) cuenta como «no existe». */
+  const fn=x=>{scope.x=x;let y;try{y=code.evaluate(scope)}catch(e){return NaN}return typeof y==='number'&&Number.isFinite(y)?y:NaN};
+  fn.src=node.toString();
+  return fn;
+}
+/* Busca dónde la función no existe dentro del tramo [a, b]: fuera del dominio o asíntota vertical. */
+function avisoDominio(fn,a,b){
+  const n=Math.ceil((b-a)/.01);let prev=null,prevX=a;
+  for(let i=0;i<=n;i++){
+    const x=a+(b-a)*i/n,y=fn(x);
+    if(!Number.isFinite(y)){
+      let u=prevX,v=x;
+      if(prev!==null)for(let k=0;k<40;k++){const m=(u+v)/2;if(Number.isFinite(fn(m)))u=m;else v=m}
+      const big=prev!==null&&Math.abs(fn(u))>50;
+      return big?`Ojo: hay una asíntota vertical cerca de x ≈ ${fmt(v)}. Ahí la función no está definida y el puente se rompe.`
+        :i===0?(()=>{let j=1;while(j<=n&&!Number.isFinite(fn(a+(b-a)*j/n)))j++;
+          return j>n?`Ojo: la función no está definida en ningún punto entre x = ${fmt(a)} y x = ${fmt(b)}.`
+            :`Ojo: la función no está definida entre x = ${fmt(a)} y x ≈ ${fmt(a+(b-a)*j/n)} (fuera de su dominio). El puente no puede empezar en la orilla.`})()
+        :`Ojo: la función no está definida desde x ≈ ${fmt(v)} (fuera de su dominio). Ahí el puente se interrumpe.`;
+    }
+    if(prev!==null&&y*prev<0&&Math.abs(y-prev)>20&&Math.max(Math.abs(y),Math.abs(prev))>30)return`Ojo: hay una asíntota vertical cerca de x ≈ ${fmt((x+prevX)/2)}. Ahí la función no está definida y el puente se rompe.`;
+    prev=y;prevX=x;
+  }
+  return'';
+}
 /* Pasa los deslizadores actuales a una fórmula que el jugador puede editar. */
 const nTxt=v=>String(Math.round(v*1e4)/1e4);
 const shTxt=h=>near0(h)?'x':h>0?`x - ${nTxt(h)}`:`x + ${nTxt(-h)}`;
@@ -158,7 +269,7 @@ const FAM={
   life:'La distancia a una señal de la vía mientras te acercas y luego te alejas.',demo:{a:1,h:0,k:-2},
   rand:()=>({a:pick([-2,-1.5,-1,-.5,.5,1,1.5,2]),h:rint(-3,3),k:rint(-3,3)}),tableX:p=>[-2,-1,0,1,2].map(d=>p.h+d)},
  cuadratica:{name:'Cuadrática',
-  params:[{id:'a',min:-1,max:1,step:.05,role:'abre o cierra la parábola; si es negativa, se voltea'},{id:'h',...PARAMS.h,role:'mueve el vértice a izquierda o derecha'},{id:'k',...PARAMS.k,role:'sube o baja el vértice'}],def:{a:.25,h:4,k:1},
+  params:[{id:'a',min:-1,max:1,step:.01,role:'abre o cierra la parábola; si es negativa, se voltea'},{id:'h',...PARAMS.h,role:'mueve el vértice a izquierda o derecha'},{id:'k',...PARAMS.k,role:'sube o baja el vértice'}],def:{a:.25,h:4,k:1},
   f:(x,p)=>p.a*(x-p.h)**2+p.k, eq:p=>`y = ${V(0,p.a)}(${shift(1,p.h)})²${tail(2,p.k)}`, form:'y = a(x − h)² + k', handle:{x:'h',y:'k'},
   dom:'Todos los números reales',shape:'es una parábola: una curva suave y simétrica con un solo vértice',tableCue:'las segundas diferencias de y son constantes',
   life:'La trayectoria de un balón o la forma de un arco.',demo:{a:.4,h:0,k:-3},
@@ -220,7 +331,7 @@ const FAM={
 };
 const FAM_IDS=Object.keys(FAM);
 /* La fórmula escrita no entra en la guía ni en el examen, por eso se añade después de FAM_IDS. */
-FAM.texto={name:'Fórmula escrita',params:[],def:{},f:(x,p)=>p.fn?p.fn(x):NaN,eq:p=>`y = ${esc(p.src||'…')}`,form:'y = f(x)',dom:'Depende de tu fórmula',shape:'la define tu fórmula',tableCue:'depende de tu fórmula',life:''};
+FAM.texto={name:'Fórmula escrita',params:[],def:{},f:(x,p)=>p.fn?p.fn(x):NaN,eq:p=>`y = ${esc(p.src||'…')}${p.px?' <small>(en px del informe)</small>':''}`,form:'y = f(x)',dom:'Depende de tu fórmula',shape:'la define tu fórmula',tableCue:'depende de tu fórmula',life:''};
 const fullName=id=>id==='texto'?'Fórmula escrita':id==='tramos'?'Función por tramos':id==='seno'?'Función trigonométrica (seno)':id==='absoluto'?'Función valor absoluto':id==='raiz'?'Función raíz cuadrada':`Función ${FAM[id].name.toLowerCase()}`;
 
 /* ---------- regiones ---------- */
@@ -248,11 +359,13 @@ const LEVELS=[
   story:'Un teleférico cruza el cañón a poca altura. El puente debe bajar en línea recta, doblar en un punto y volver a subir.',
   why:'Son dos rectas simétricas que se unen en una esquina. Una parábola sería redondeada en el fondo.',
   hint:'La esquina está en (h, k). Arrastra el punto blanco hasta allí y luego ajusta a para que llegue a las orillas.'},
- {n:4,id:'arco',name:'Arco del río',region:'selva',fam:'cuadratica',rep:'eq',sol:{a:-.1,h:6,k:5.5},start:{a:.25,h:4,k:3},xL:0,xR:12,pillars:[3,9],obs:[{t:'boat',x:6,y:4}],
+ /* Caso de estudio del informe: f(x) = −0.0025(x − 400)² + 150 en [200, 600] px, orillas en y = 50 px.
+    Con 1 unidad = 100/3 px queda y = −(1/12)(x − 6)² + 4.5 en [0, 12], orillas en y = 1.5 y pendiente ±1 en los anclajes. */
+ {n:4,id:'arco',name:'Arco del río',region:'selva',fam:'cuadratica',rep:'eq',informe:{x0:200,K:100/3},sol:{a:-1/12,h:6,k:4.5},start:{a:.25,h:4,k:3},xL:0,xR:12,pillars:[3,9],obs:[{t:'boat',x:6,y:4}],
   opts:['cuadratica','cubica','absoluto','exponencial'],
   story:'Un velero de mástil alto navega este río. El ingeniero jefe mandó la fórmula del arco por radio.',
   why:'La x aparece elevada al cuadrado. Por eso la gráfica es una parábola con vértice en (h, k).',
-  hint:'Compara tu ecuación con la del plano: y = −0.1(x − 6)² + 5.5. Un valor negativo de a voltea la parábola.'},
+  hint:'Compara tu ecuación con la del plano: y = −0.08(x − 6)² + 4.5 (a = −1/12). Un valor negativo de a voltea la parábola. En «Escribir fórmula» puedes usar las unidades del informe: −0.0025*(x − 400)^2 + 150.'},
  {n:5,id:'eco',name:'Risco del eco',region:'selva',fam:'raiz',rep:'desc',desc:'“El camino arranca de golpe en un punto. Antes de ese punto no existe nada. Primero sube rápido y luego cada vez más despacio, pero en ningún punto hay una asíntota vertical.”',sol:{a:2,h:0,k:-1},start:{a:1,h:3,k:0},xL:1,xR:9,pillars:[4,6.25],obs:[],
   opts:['raiz','logaritmica','exponencial','cuadratica'],
   story:'La guía local describió el terreno por teléfono. Escucha con cuidado: dos funciones se parecen mucho.',
@@ -379,7 +492,8 @@ function analyze(L,famId,p){
   rows.push({label:'Pendiente máxima',ok:maxS<=MAX_SLOPE,val:`${fmt(maxS)} ≤ ${fmt(MAX_SLOPE)}`});
   if(maxS>MAX_SLOPE){
     const fx=runs.flatMap(r=>r.slice(1).map((n,i)=>({x:n.x,s:Math.abs((n.y-r[i].y)/(n.x-r[i].x))}))).find(n=>n.s>MAX_SLOPE);
-    add(fx?fx.x:mx,'slope',`Cerca de x = ${fmt(fx?fx.x:mx)} la pendiente llega a ${fmt(fx?fx.s:maxS)}. El camión solo soporta hasta ${fmt(MAX_SLOPE)} y se voltea.`);
+    /* Aviso: en la prueba física es Matter.js quien decide si el camión sube (tan θ ≤ μ) o patina. */
+    add(fx?fx.x:mx,'slope',`Cerca de x = ${fmt(fx?fx.x:mx)} la pendiente llega a ${fmt(fx?fx.s:maxS)}. El camión solo sube con seguridad hasta ${fmt(MAX_SLOPE)}: más empinado, las llantas patinan.`);
   }
   if(runs.length>1)rows.splice(rows.length-1,0,{label:'Puente continuo',ok:cont,val:cont?'sí':'con huecos'});
   /* resonancia */
@@ -575,7 +689,15 @@ const cv=document.createElement('canvas'),ctx=cv.getContext('2d');
 cv.setAttribute('role','img');
 let W=0,H=0,DPR=1,SC=1,VC=6,YB=-2.7,bg=null,bgFor=null;
 const setScale=()=>{SC=Math.min(W/16.5,H/10.4);YB=-2.7-.3*Math.max(0,H/SC-10.4)};
-const X=x=>W/2+(x-VC)*SC,Y=y=>H-(y-YB)*SC,IX=px=>(px-W/2)/SC+VC,IY=py=>(H-py)/SC+YB;
+/* ---------- coordenadas ----------
+   El juego y el informe usan coordenadas matemáticas (y hacia arriba, en unidades del nivel).
+   El canvas tiene la y hacia abajo y mide en píxeles. Toda conversión pasa por estas dos funciones:
+     toScreen(x, y)   → píxel del canvas    (VC = x en el centro, YB = y en el borde inferior, SC = px por unidad)
+     toWorld(px, py)  → punto matemático
+   X, Y, IX, IY son atajos de una sola coordenada que usa el resto del dibujo. */
+const toScreen=(x,y)=>({x:W/2+(x-VC)*SC,y:H-(y-YB)*SC});
+const toWorld=(px,py)=>({x:(px-W/2)/SC+VC,y:(H-py)/SC+YB});
+const X=x=>toScreen(x,0).x,Y=y=>toScreen(0,y).y,IX=px=>toWorld(px,0).x,IY=py=>toWorld(0,py).y;
 function resize(){
   const host=cv.parentElement;if(!host)return;
   const r=host.getBoundingClientRect();if(r.width<2||r.height<2)return;
@@ -837,8 +959,9 @@ function stepSim(dt){
 }
 function confetti(){if(REDUCED)return;const L=S.level,cs=['#FF8F24','#FFCB52','#4CE0A4','#86D9FF','#FFA6C9'];for(let i=0;i<70;i++)S.sim.parts.push({x:L.xR+1.5+(Math.random()-.5)*6,y:L.yR+3+Math.random()*3,vx:(Math.random()-.5)*2.2,vy:Math.random()*1.5,g:1.8,life:2.2+Math.random()*1.5,c:pick(cs),r:3+Math.random()*3,tri:1})}
 
-/* dibujo principal */
-function draw(t){
+/* dibujo principal (canvas 2D: menú, Reconoce y Construye).
+   No se llama draw: p5 arranca en «modo global» si encuentra una función global con ese nombre. */
+function dibujarEscena(t){
   const L=S.level;if(!L||!W)return;
   VC=(L.xL+L.xR)/2;
   const key=L.n+'-'+W+'-'+H;if(!bg||bgFor!==key){setScale();renderBg(L)}
@@ -896,16 +1019,18 @@ function loop(ts){
   if(document.hidden)return;
   if(S.screen!=='menu'&&S.screen!=='game')return;
   if(!cv.parentElement)return;
-  if(S.sim)stepSim(dt);
+  /* En el paso Prueba, p5 dibuja y Matter simula (ver «prueba física» más abajo); aquí solo se actualiza el HUD. */
+  const phys=S.sim&&S.sim.phys;
+  if(S.sim&&!phys)stepSim(dt);
   if(S.screen==='menu'&&S.sim&&S.sim.state==='win'){S.demoWait+=dt;if(S.demoWait>2.2){S.demoWait=0;S.sim=newSim()}}
-  try{draw(t)}catch(e){console.error(e)}
+  if(!phys)try{dibujarEscena(t)}catch(e){console.error(e)}
   if(S.screen==='game'&&S.sim&&ts-hudT>120){hudT=ts;updateHud()}
 }
 function updateHud(){
   const s=S.sim,hud=$('#hud'),L=S.level;if(!s||s.state!=='run'){hud.hidden=true;return}
   const on=s.tx>=L.xL&&s.tx<=L.xR;hud.hidden=!on;if(!on)return;
   const y=S.an.f(s.tx),y2=S.an.f(s.tx+.02),y1=S.an.f(s.tx-.02);
-  hud.textContent=`x = ${fmt(s.tx)} · f(x) = ${y===null?'—':fmt(y)} · pendiente = ${y1!==null&&y2!==null?fmt((y2-y1)/.04):'—'}`;
+  hud.textContent=`x = ${fmt(s.tx)} · f(x) = ${y===null?'—':fmt(y)} · pendiente = ${y1!==null&&y2!==null?fmt((y2-y1)/.04):'—'}${s.slip?' · ¡patina!':''}`;
 }
 
 /* arrastre del punto de control */
@@ -926,8 +1051,297 @@ cv.addEventListener('pointermove',e=>{
 });
 const endDrag=()=>{dragging=false};cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
 
+/* ---------- prueba física: Matter.js simula, p5.js dibuja ----------
+   Flujo del paso «Prueba»:
+     Entrada UI (deslizadores o fórmula) → Math.js calcula f(x) → p5.js crea la escena y en cada cuadro
+     avanza Matter.js (Engine.update) y dibuja → validación: el camión llega a la orilla B, cae o se atasca.
+   Mundo físico: 1 unidad del nivel = K = 100/3 px y la y hacia abajo, como espera Matter.
+     toPhys(x, y)    → punto del mundo físico (px)      x_px = X0 + (x − xL)·K,  y_px = −y·K
+     fromPhys(px, py) → punto matemático
+   En el Arco del río (x de 0 a 12) esto da justo el tramo [200, 600] px del caso de estudio. */
+const PHYS={
+  K:100/3,X0:200,
+  DX:.3,          /* Δx entre puntos del tablero: 0.3 unidades = 10 px */
+  DECK:.24,       /* grosor del tablero */
+  TRAC:2.5,       /* coeficiente de adherencia de las llantas (μ): sube mientras tan θ ≤ μ. Ver nota del caso de estudio */
+  SPEED:2.7,      /* velocidad de crucero del camión, en unidades por segundo */
+  STUCK:3,        /* segundos sin avanzar para declararlo atascado */
+  STEP:1000/120,  /* paso fijo de Engine.update, en ms */
+  GRAV:.0006,     /* escala de la gravedad de Matter */
+};
+/* Fallas estructurales que ya detecta analyze(): cuando el camión llega ahí, el tablero se suelta y cae. */
+const COLAPSO=new Set(['pillar','boat','cable','anchorL','anchorR','resonance']);
+const toPhys=(x,y,L=S.level)=>({x:PHYS.X0+(x-L.xL)*PHYS.K,y:-y*PHYS.K});
+const fromPhys=(px,py,L=S.level)=>({x:L.xL+(px-PHYS.X0)/PHYS.K,y:-py/PHYS.K});
+
+/* Fase 2: evalúa f(x) a lo largo del abismo con paso Δx, tramo por tramo (los huecos y saltos quedan abiertos). */
+function puntosPuente(an){
+  return an.runs.map(r=>{
+    const a=r[0].x,b=r[r.length-1].x,n=Math.max(1,Math.round((b-a)/PHYS.DX)),pts=[];
+    for(let i=0;i<=n;i++){const x=a+(b-a)*i/n,y=an.f(x);if(y!==null)pts.push({x,y})}
+    return pts;
+  }).filter(p=>p.length>1);
+}
+/* Fase 1: orillas A y B como cuerpos estáticos. */
+function crearOrillas(L){
+  const {Bodies}=Matter,K=PHYS.K,ancho=14,fondo=WATER-4;
+  return[[L.xL-ancho,L.xL,L.yL,'orilla A'],[L.xR,L.xR+ancho,L.yR,'orilla B']].map(([a,b,top,label])=>{
+    const c=toPhys((a+b)/2,(top+fondo)/2,L);
+    return Bodies.rectangle(c.x,c.y,(b-a)*K,(top-fondo)*K,{isStatic:true,friction:1,frictionStatic:1,label});
+  });
+}
+/* Fase 3: un rectángulo estático y rotado por cada par de puntos; su cara superior queda sobre la curva. */
+function crearTablero(tramos,L){
+  const {Bodies}=Matter,T=PHYS.DECK*PHYS.K,out=[];
+  tramos.forEach(pts=>{for(let i=1;i<pts.length;i++){
+    const A=toPhys(pts[i-1].x,pts[i-1].y,L),B=toPhys(pts[i].x,pts[i].y,L);
+    const dx=B.x-A.x,dy=B.y-A.y,len=Math.hypot(dx,dy),nx=-dy/len,ny=dx/len; /* normal hacia abajo de la vía */
+    const b=Bodies.rectangle((A.x+B.x)/2+nx*T/2,(A.y+B.y)/2+ny*T/2,len+2,T,{isStatic:true,angle:Math.atan2(dy,dx),friction:1,frictionStatic:1,restitution:0,label:'tablero'});
+    b.xm=(pts[i-1].x+pts[i].x)/2;out.push(b);
+  }});
+  return out;
+}
+/* Fase 4: chasis y dos ruedas unidas por Constraint. Las tres piezas están en el mismo grupo negativo,
+   así que no chocan entre sí. El chasis físico es bajo y corto para que el centro de masa quede cerca del eje;
+   la cabina se dibuja encima, pero no tiene masa. */
+function crearVehiculo(L){
+  const {Bodies,Body,Constraint}=Matter,K=PHYS.K,r=.18*K,wb=.46*K,group=Body.nextGroup(true);
+  const p=toPhys(L.xL-3.2,L.yL+.18+.02,L);
+  /* mask 0: el chasis no toca el terreno (solo las ruedas), como un camión de chasis alto que no se «encalla» en las crestas */
+  const chassis=Bodies.rectangle(p.x,p.y,1.04*K,.16*K,{collisionFilter:{group,mask:0},density:.004,friction:.2,label:'chasis'});
+  const wheels=[-1,1].map(s=>Bodies.circle(p.x+s*wb,p.y,r,{collisionFilter:{group},density:.002,friction:1,frictionStatic:2,restitution:0,label:'rueda'}));
+  const axles=wheels.map((w,i)=>Constraint.create({bodyA:chassis,pointA:{x:(i?1:-1)*wb,y:0},bodyB:w,pointB:{x:0,y:0},length:0,stiffness:.6,damping:.15}));
+  return{chassis,wheels,axles,r};
+}
+function crearSimFisica(L,an){
+  const {Engine,Composite}=Matter;
+  const engine=Engine.create({gravity:{x:0,y:1,scale:PHYS.GRAV},positionIterations:10,velocityIterations:10});
+  const banks=crearOrillas(L),deckPts=puntosPuente(an),deck=crearTablero(deckPts,L),car=crearVehiculo(L);
+  Composite.add(engine.world,[...banks,...deck,car.chassis,...car.wheels,...car.axles]);
+  const sim={phys:true,engine,L,an,banks,deck,deckPts,car,t:0,acc:0,tx:L.xL-3.2,ty:L.yL,ang:0,state:'run',issue:null,
+    collapse:an.issues.find(i=>COLAPSO.has(i.code))||null,sup:supports(an,L),best:-Infinity,bestT:0,flag:0,parts:[],reported:false,wobT:0,
+    alChocar:()=>{},alGanar:()=>{},alPerder:()=>{}};
+  return sim;
+}
+/* Pendiente más empinada de subida cerca de x (para explicar por qué se atascó). */
+function pendienteCerca(an,x,L){
+  let s=0,at=x;for(let u=Math.max(L.xL,x-.6);u<=Math.min(L.xR-.05,x+1.6);u+=.05){const a=an.f(u),b=an.f(u+.05);if(a!==null&&b!==null){const m=(b-a)/.05;if(m>s){s=m;at=u}}}
+  return{s,at};
+}
+function derrumbe(sim,issue){
+  sim.state='crash';sim.crashT=sim.t;sim.issue=issue;
+  sim.deck.forEach(b=>{if(!sim.sup.some(q=>Math.abs(b.xm-q)<.45))b.releaseAt=sim.t+Math.abs(b.xm-issue.x)*.13+Math.random()*.08});
+  sim.alChocar();
+}
+/* Fase 5: derrota física (cae al abismo, se atasca o se voltea). Si analyze() ya conocía la causa, se usa su explicación. */
+function falloFisico(sim,kind){
+  const x=sim.tx,an=sim.an,near=an.issues.find(i=>i.code!=='slope'&&Math.abs(i.x-x)<2.5);
+  let msg;
+  if(kind==='fall')msg=`El camión cayó al abismo cerca de x = ${fmt(x)}. Revisa que el puente sea continuo y llegue a las dos orillas.`;
+  else{
+    const {s,at}=pendienteCerca(an,x,sim.L),deg=Math.atan(s)*180/Math.PI;
+    msg=kind==='flip'
+      ?`El camión se volcó cerca de x = ${fmt(x)}: la pendiente llega a ${fmt(s)} (${Math.round(deg)}°) y cambia demasiado rápido.`
+      :s>=PHYS.TRAC*.85
+        ?`El camión se quedó atascado cerca de x = ${fmt(at)}: la pendiente llega a ${fmt(s)} (${Math.round(deg)}°). Para subir sin patinar se necesita una adherencia μ ≥ tan θ = ${fmt(s)} y las llantas tienen μ = ${fmt(PHYS.TRAC)}. Suaviza la curva.`
+        :`El camión se quedó atascado cerca de x = ${fmt(x)} y no logró avanzar en ${PHYS.STUCK} segundos. Revisa la forma del puente en esa zona.`;
+  }
+  sim.issue=near&&(kind==='fall'||['gap','domain','jump'].includes(near.code))?near:{x,code:kind,msg};
+  sim.state='crash';sim.crashT=sim.t;sim.alChocar();
+}
+function subpasoFisica(sim){
+  const {Engine,Body,Composite}=Matter,L=sim.L,c=sim.car,h=PHYS.STEP;
+  /* Adherencia (ley de Coulomb): una rueda motriz sube sin patinar mientras tan θ ≤ μ.
+     La fricción de Matter es aproximada, así que el límite se aplica aquí: si la pendiente lo supera,
+     las llantas pierden agarre, giran en falso y el camión resbala hacia atrás. */
+  sim.slip=sim.state==='run'&&Math.tan(clamp(sim.ang,-1.5,1.5))>PHYS.TRAC;
+  c.wheels.forEach(w=>{w.friction=sim.slip?.02:1});
+  /* tracción: velocidad angular de las ruedas (rad por cada 1000/60 ms en Matter 0.19) */
+  if(sim.state==='run'){const v=PHYS.SPEED*PHYS.K/60*Math.min(1,sim.t/.6);c.wheels.forEach(w=>Body.setAngularVelocity(w,v/c.r*(sim.slip?2.5:1)))}
+  else if(sim.state==='win')c.wheels.forEach(w=>Body.setAngularVelocity(w,w.angularVelocity*.92));
+  Engine.update(sim.engine,h);sim.t+=h/1000;
+  const p=fromPhys(c.chassis.position.x,c.chassis.position.y,L);sim.tx=p.x;sim.ty=p.y;sim.ang=-c.chassis.angle;
+  /* tablero que se suelta tras una falla estructural */
+  sim.deck.forEach(b=>{if(b.releaseAt!==undefined&&sim.t>=b.releaseAt){b.releaseAt=undefined;b.loose=true;Body.setStatic(b,false);Body.setAngularVelocity(b,(Math.random()-.5)*.06)}});
+  /* agua: salpica al entrar y frena lo que se hunde */
+  [c.chassis,...sim.deck.filter(b=>b.loose)].forEach(b=>{
+    const y=fromPhys(0,b.position.y,L).y;if(y>=WATER)return;
+    if(!b.wet){b.wet=true;if(sim===S.sim)splash(fromPhys(b.position.x,0,L).x,b===c.chassis?28:6)}
+    Body.setVelocity(b,{x:b.velocity.x*.9,y:b.velocity.y*.9});
+    if(y<WATER-6)Composite.remove(sim.engine.world,b);
+  });
+  if(sim.state==='run'){
+    if(sim.collapse&&sim.tx+.55>=sim.collapse.x)derrumbe(sim,sim.collapse);
+    else if(sim.tx>L.xR+1.35){sim.state='win';sim.winT=sim.t;sim.alGanar()}
+    else if(sim.ty<WATER)falloFisico(sim,'fall');
+    else if(Math.abs(Math.atan2(Math.sin(sim.ang),Math.cos(sim.ang)))>1.9)falloFisico(sim,'flip');
+    else if(sim.tx>sim.best+.1){sim.best=sim.tx;sim.bestT=sim.t}
+    else if(sim.t-sim.bestT>PHYS.STUCK)falloFisico(sim,'stuck');
+  }else if(sim.state==='crash'&&!sim.reported&&sim.t-sim.crashT>2.2){sim.reported=true;sim.alPerder()}
+}
+function pasoFisica(sim,dt){
+  sim.acc+=Math.min(dt,.05)*1000;
+  let n=0;while(sim.acc>=PHYS.STEP&&n<8){sim.acc-=PHYS.STEP;subpasoFisica(sim);n++}
+  if(sim.state==='win')sim.flag=Math.min(1,sim.flag+dt*1.2);
+  sim.parts.forEach(p=>{p.vy-=p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt});
+  sim.parts=sim.parts.filter(p=>p.life>0);
+}
+
+/* dibujo de la prueba con p5.js (modo instancia dentro de #stage) */
+let P5=null;
+function iniciarP5(){
+  if(P5){P5.remove();P5=null}
+  const host=$('#stage');
+  P5=new p5(sk=>{
+    sk.setup=()=>{
+      sk.pixelDensity(DPR);
+      const c=sk.createCanvas(Math.max(2,Math.round(W)),Math.max(2,Math.round(H)));
+      host.insertBefore(c.elt,host.firstChild);
+      c.elt.setAttribute('role','img');c.elt.setAttribute('aria-label',`Prueba física del puente ${S.level.name}: un camión intenta cruzar`);
+    };
+    sk.draw=()=>{
+      const sim=S.sim;if(!sim||!sim.phys)return;
+      if(Math.round(W)!==sk.width||Math.round(H)!==sk.height)sk.resizeCanvas(Math.round(W),Math.round(H));
+      if(!document.hidden)pasoFisica(sim,sk.deltaTime/1000);
+      try{dibujarPrueba(sk,sk.millis()/1000,sim)}catch(e){console.error(e)}
+    };
+  },host);
+  cv.style.display='none';
+}
+function detenerP5(){if(P5){P5.remove();P5=null}cv.style.display='';if(S.sim&&S.sim.phys)S.sim=null}
+const pCol=(sk,hex,a)=>{const c=sk.color(hex);if(a!==undefined)c.setAlpha(a);return c};
+function pPoly(sk,pts,col){sk.noStroke();sk.fill(col);sk.beginShape();pts.forEach(p=>sk.vertex(p[0],p[1]));sk.endShape(sk.CLOSE)}
+const physScreen=(v,L)=>{const m=fromPhys(v.x,v.y,L);return toScreen(m.x,m.y)};
+function dibujarPrueba(sk,t,sim){
+  const L=sim.L;if(!W)return;
+  VC=(L.xL+L.xR)/2;
+  if(!bg||bgFor!==L.n+'-'+W+'-'+H){setScale();renderBg(L)}
+  sk.clear();sk.drawingContext.drawImage(bg,0,0,W,H);
+  aguaP5(sk,t,false);
+  mallaP5(sk,L);
+  L.obs.forEach(o=>{if(o.t==='boat')barcoP5(sk,o,t)});
+  if(L.stayed)torresP5(sk,L);else L.pts.forEach(pt=>{const r=sim.an.rows.find(q=>q.pt===pt);pilarP5(sk,pt,r&&r.ok)});
+  L.obs.forEach(o=>{if(o.t==='cable')cableP5(sk,o,t)});
+  orillasP5(sk,sim);
+  tableroP5(sk,sim);
+  vehiculoP5(sk,sim);
+  banderaP5(sk,sim);
+  aguaP5(sk,t,true);
+  if(L.wind)vientoP5(sk,REDUCED?0:t);
+  particulasP5(sk,sim);
+}
+function aguaP5(sk,t,front){
+  const R=S.level.reg,y0=Y(WATER);
+  sk.noStroke();sk.fill(front?pCol(sk,R.water[0],204):pCol(sk,R.water[1]));
+  sk.beginShape();for(let px=0;px<=W+24;px+=24)sk.vertex(px,y0+Math.sin(px*.02+t*1.1)*(front?2:3)+Math.sin(px*.047-t*.8)*1.4);sk.vertex(W,H);sk.vertex(0,H);sk.endShape(sk.CLOSE);
+  if(front){sk.noFill();sk.stroke(R.water[2]);sk.strokeWeight(1.6);sk.beginShape();for(let px=0;px<=W+24;px+=24)sk.vertex(px,y0+Math.sin(px*.02+t*1.1)*2+Math.sin(px*.047-t*.8)*1.4);sk.endShape()}
+}
+/* malla cartesiana: una línea por unidad, ejes más marcados y números pares */
+function mallaP5(sk,L){
+  const ink=L.reg.ink,a=toWorld(0,H),b=toWorld(W,0);
+  sk.strokeWeight(1);
+  for(let x=Math.ceil(a.x);x<=Math.floor(b.x);x++){sk.stroke(pCol(sk,ink,x%2?20:38));sk.line(X(x),0,X(x),H)}
+  for(let y=Math.ceil(a.y);y<=Math.floor(b.y);y++){sk.stroke(pCol(sk,ink,y%2?20:38));sk.line(0,Y(y),W,Y(y))}
+  sk.stroke(pCol(sk,ink,170));sk.strokeWeight(1.6);sk.line(0,Y(0),W,Y(0));sk.line(X(0),0,X(0),H);
+  sk.textFont('Atkinson Hyperlegible, Verdana, sans-serif');sk.textStyle(sk.BOLD);sk.textSize(W<520?9:11);
+  sk.stroke(255,190);sk.strokeWeight(3);sk.fill(ink);
+  sk.textAlign(sk.CENTER,sk.TOP);for(let x=Math.ceil(a.x);x<=Math.floor(b.x);x++)if(x%2===0&&x!==0)sk.text(x,X(x),Y(0)+3);
+  sk.textAlign(sk.RIGHT,sk.CENTER);for(let y=Math.ceil(a.y);y<=Math.floor(b.y);y++)if(y%2===0&&y!==0&&y>=-2)sk.text(fmt(y),X(0)-4,Y(y));
+}
+function pilarP5(sk,pt,ok){
+  const hw=.2*SC,hwB=.3*SC,top=Y(pt.y),bot=Y(WATER-.8),cx=X(pt.x);
+  pPoly(sk,[[cx-hw,top],[cx,top],[cx,bot],[cx-hwB,bot]],'#B7B0A3');
+  pPoly(sk,[[cx,top],[cx+hw,top],[cx+hwB,bot],[cx,bot]],'#8D877B');
+  pPoly(sk,[[cx-hw*1.5,top-.04*SC],[cx+hw*1.5,top-.04*SC],[cx+hw*1.2,top+.16*SC],[cx-hw*1.2,top+.16*SC]],ok?'#2CCB86':'#FF8F24');
+}
+function torresP5(sk,L){
+  const top=Math.max(L.yL,L.yR)+1.1,hw=.16*SC;
+  [[L.xL,L.yL],[L.xR,L.yR]].forEach(([x,y])=>{
+    const cx=X(x);sk.stroke('#232B38');sk.strokeWeight(Math.max(1,.035*SC));
+    L.pts.filter(pt=>Math.abs(pt.x-x)<=(L.xR-L.xL)/2).forEach(pt=>sk.line(cx,Y(top),X(pt.x),Y(pt.y)));
+    pPoly(sk,[[cx-hw,Y(top)],[cx,Y(top)],[cx,Y(y)],[cx-hw*1.4,Y(y)]],'#B7B0A3');
+    pPoly(sk,[[cx,Y(top)],[cx+hw,Y(top)],[cx+hw*1.4,Y(y)],[cx,Y(y)]],'#8D877B');
+  });
+}
+function barcoP5(sk,o,t){
+  const u=SC,mh=(o.y-WATER)*u,sailTop=mh-.12*u;
+  sk.push();sk.translate(X(o.x),Y(WATER));sk.rotate((REDUCED?0:Math.sin(t*1.1+o.x)*.05)*.5);
+  pPoly(sk,[[-.9*u,-.34*u],[.9*u,-.34*u],[.62*u,.12*u],[-.62*u,.12*u]],'#7A2F2F');
+  pPoly(sk,[[-.9*u,-.34*u],[.9*u,-.34*u],[.85*u,-.26*u],[-.85*u,-.26*u]],'#F7F1E3');
+  pPoly(sk,[[-.03*u,-mh],[.03*u,-mh],[.03*u,-.3*u],[-.03*u,-.3*u]],'#3A2B22');
+  pPoly(sk,[[.05*u,-sailTop],[.05*u,-.45*u],[.78*u,-.45*u]],'#FDF8EC');
+  pPoly(sk,[[-.05*u,-sailTop*.9],[-.05*u,-.45*u],[-.55*u,-.45*u]],'#F2E4C8');
+  sk.pop();
+}
+function cableP5(sk,o,t){
+  const R=S.level.reg,cy=Y(o.y+1.15),u=SC,cx=X(o.x)+(REDUCED?0:Math.sin(t*.6)*.05*SC),top=Y(o.y+.75),bot=Y(o.y);
+  sk.stroke(R.ink);sk.strokeWeight(Math.max(1.5,.04*SC));sk.line(0,cy,W,cy+6);sk.line(cx,cy+6*(cx/W),cx,top);
+  pPoly(sk,[[cx-.5*u,top],[cx+.5*u,top],[cx+.55*u,bot],[cx-.55*u,bot]],'#E04F3C');
+  pPoly(sk,[[cx-.38*u,top+.1*u],[cx+.38*u,top+.1*u],[cx+.4*u,top+.36*u],[cx-.4*u,top+.36*u]],'#D6F0F4');
+}
+/* orillas: la vía sobre la cara superior de cada cuerpo estático */
+function orillasP5(sk,sim){
+  const L=sim.L,th=.2*SC;
+  sim.banks.forEach(b=>{
+    const top=[...b.vertices].sort((p,q)=>p.y-q.y).slice(0,2).map(v=>physScreen(v,L)).sort((p,q)=>p.x-q.x);
+    const [a,c]=top;
+    pPoly(sk,[[a.x,a.y],[c.x,c.y],[c.x,c.y+th],[a.x,a.y+th]],'#3A4150');
+    sk.stroke('#F4E7A9');sk.strokeWeight(Math.max(1,.035*SC));sk.drawingContext.setLineDash([.35*SC,.35*SC]);sk.line(a.x,a.y+th*.5,c.x,c.y+th*.5);sk.drawingContext.setLineDash([]);
+  });
+}
+/* tablero: cada rectángulo de Matter con su color de tensión; los que se sueltan, en rojo */
+function tableroP5(sk,sim){
+  const L=sim.L,u=SC;
+  /* cercha bajo los tramos que siguen en pie */
+  sk.stroke('#7C5A3C');sk.strokeWeight(Math.max(1.2,.05*u));
+  sim.deck.forEach((b,i)=>{if(b.loose||i%2)return;const v=b.vertices.map(q=>physScreen(q,L)),n=sim.deck[i+2];
+    const lo=[(v[2].x+v[3].x)/2,(v[2].y+v[3].y)/2],ang=b.angle,dn=[-Math.sin(ang)*.3*u,Math.cos(ang)*.3*u];
+    sk.line(lo[0],lo[1],lo[0]+dn[0],lo[1]+dn[1]);
+    if(n&&!n.loose&&Math.abs(n.xm-b.xm)<.7){const w=n.vertices.map(q=>physScreen(q,L)),lo2=[(w[2].x+w[3].x)/2,(w[2].y+w[3].y)/2];sk.line(lo[0]+dn[0],lo[1]+dn[1],lo2[0],lo2[1]);sk.line(lo[0]+dn[0],lo[1]+dn[1],lo2[0]+dn[0],lo2[1]+dn[1])}
+  });
+  sim.deck.forEach(b=>{
+    const col=b.loose?'#E8574B':sim.state==='run'?stressCol(stress(b.xm,sim)):'#3A4150';
+    pPoly(sk,b.vertices.map(q=>{const p=physScreen(q,L);return[p.x,p.y]}),col);
+  });
+}
+function vehiculoP5(sk,sim){
+  const L=sim.L,c=sim.car,p=physScreen(c.chassis.position,L);
+  sk.push();sk.translate(p.x,p.y);sk.rotate(c.chassis.angle);sk.scale(SC*1.2,-SC*1.2);sk.translate(0,-.14);
+  const P2=(pts,col)=>pPoly(sk,pts,col);
+  P2([[-.74,.16],[.7,.16],[.7,.3],[-.74,.3]],'#232B38');
+  P2([[-.74,.28],[.12,.28],[.12,.86],[-.74,.86]],'#FF8F24');
+  P2([[-.74,.86],[.12,.86],[.12,.68],[-.74,.56]],'#FFA94F');
+  P2([[.16,.28],[.74,.28],[.74,.5],[.5,.74],[.16,.74]],'#14426E');
+  P2([[.26,.5],[.68,.5],[.48,.68],[.26,.68]],'#BCE9F4');
+  sk.pop();
+  c.wheels.forEach(w=>{
+    const q=physScreen(w.position,L),r=c.r/PHYS.K*SC;
+    sk.push();sk.translate(q.x,q.y);sk.rotate(w.angle);
+    sk.noStroke();sk.fill('#10151D');sk.beginShape();for(let i=0;i<8;i++){const a=i/8*Math.PI*2;sk.vertex(Math.cos(a)*r,Math.sin(a)*r)}sk.endShape(sk.CLOSE);
+    sk.fill('#D6DCE4');sk.rect(-r*.33,-r*.33,r*.66,r*.66);
+    sk.pop();
+  });
+}
+function banderaP5(sk,sim){
+  if(sim.flag<=0)return;const L=sim.L,fx=X(L.xR+.45),fy=Y(L.yR);
+  sk.noStroke();sk.fill('#232B38');sk.rect(fx-1.5,fy-1.8*SC,3,1.8*SC);
+  const up=1.3*SC*sim.flag;pPoly(sk,[[fx+1,fy-up-.5*SC],[fx+.9*SC,fy-up-.25*SC],[fx+1,fy-up]],'#FF8F24');
+}
+function vientoP5(sk,t){
+  sk.stroke(255,153);sk.strokeWeight(Math.max(1.2,.04*SC));sk.strokeCap(sk.ROUND);
+  for(let i=0;i<12;i++){const len=(.9+(i%3)*.5)*SC,sp=70+(i%4)*28,x=((t*sp+i*137)%(W+len*2))-len,y=H*(.08+.055*i)+Math.sin(t*1.4+i)*5;sk.line(x,y,x+len,y)}
+}
+function particulasP5(sk,sim){
+  sim.parts.forEach(p=>{
+    const c=toScreen(p.x,p.y);
+    if(p.tri){const a=p.life*5,r=p.r;pPoly(sk,[0,2.1,4.2].map(d=>[c.x+Math.cos(a+d)*r,c.y+Math.sin(a+d)*r]),p.c)}
+    else{sk.noStroke();sk.fill(pCol(sk,p.c,255*clamp(p.life,0,1)));sk.circle(c.x,c.y,p.r*2)}
+  });
+}
+
 /* ---------- pantallas ---------- */
 function show(name){
+  detenerP5();
   S.screen=name;
   ['menu','game','exam','guide','report'].forEach(n=>{$('#s-'+n).hidden=n!==name});
   window.scrollTo(0,0);
@@ -968,7 +1382,7 @@ function goMenu(){show('menu');renderMenu()}
 
 /* obra */
 function startLevel(L){
-  S.level=L;S.idWrong=0;S.crashes=0;S.idDone=false;S.hint=false;S.sim=null;S.an=null;bg=null;
+  S.level=L;S.idWrong=0;S.crashes=0;S.idDone=false;S.hint=false;S.sim=null;S.an=null;bg=null;S.pxMode=false;
   S.famId=L.fam;S.p=L.free?{}:{...L.start};S.baseFam=null;S.baseP=null;
   VC=(L.xL+L.xR)/2;
   $('#g-where').textContent=`Obra ${L.n} de ${LEVELS.length} · ${L.reg.label}`;
@@ -987,7 +1401,7 @@ function repHtml(L){
 }
 const tableHtml=(xs,ys)=>`<table class="vals"><tr><th>x</th>${xs.map(x=>`<td>${fmt(x)}</td>`).join('')}</tr><tr><th>y</th>${ys.map(y=>`<td>${fmt(y)}</td>`).join('')}</tr></table>`;
 function enterIdentify(){
-  const L=S.level;S.phase='identify';S.sim=null;S.an=null;setSteps(0);$('#panel').setAttribute('aria-live','polite');$('#hud').hidden=true;cv.style.touchAction='auto';
+  const L=S.level;detenerP5();S.phase='identify';S.sim=null;S.an=null;setSteps(0);$('#panel').setAttribute('aria-live','polite');$('#hud').hidden=true;cv.style.touchAction='auto';
   $('#panel').innerHTML=`<h2>${esc(L.name)}</h2><p>${esc(L.story)}</p>${repHtml(L)}
    <div class="choices" id="choices">${shuffle(L.opts).map(o=>`<button class="choice" type="button" data-o="${o}">${esc(FAM[o].name)}</button>`).join('')}</div>
    <div id="id-fb"></div>
@@ -1014,7 +1428,7 @@ function setParam(id,val,d){
 const pFmt=(d,v)=>d.format?d.format(v):fmt(v);
 function syncSliders(){const F=FAM[S.famId];if(!F)return;F.params.forEach(d=>{const s=$('#sl-'+d.id),o=$('#out-'+d.id);if(s)s.value=S.p[d.id];if(o)o.textContent=pFmt(d,S.p[d.id])})}
 function enterBuild(){
-  const L=S.level;S.phase='build';S.sim=null;setSteps(1);$('#panel').setAttribute('aria-live','off');$('#hud').hidden=true;cv.style.touchAction='none';
+  const L=S.level;detenerP5();S.phase='build';S.sim=null;setSteps(1);$('#panel').setAttribute('aria-live','off');$('#hud').hidden=true;cv.style.touchAction='none';
   if(L.free&&!S.famId){S.an=null}
   renderBuild();
 }
@@ -1030,7 +1444,8 @@ function renderBuild(){
       html+=`<div class="fx"><label for="fx-input">f(x) =</label>
         <input id="fx-input" type="text" value="${esc(S.p.src||'')}" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="fx-msg">
         <div class="fx-msg" id="fx-msg" role="status"></div>
-        <small>Usa <code>x</code>, <code>+ - * / ^</code>, paréntesis, <code>sen cos tan sqrt abs ln log log2 exp cosh pi e</code>. Ejemplo: <code>-0.1*(x-6)^2+5.5</code>. Aquí x va de ${fmt(L.xL)} a ${fmt(L.xR)}.</small></div>`;
+        ${L.informe?`<label class="fx-px"><input type="checkbox" id="fx-px" ${S.pxMode?'checked':''}> Usar unidades del informe (px): x de ${fmt(L.informe.x0)} a ${fmt(L.informe.x0+(L.xR-L.xL)*L.informe.K)}, 1 unidad = ${fmt(L.informe.K)} px</label>`:''}
+        <small>Usa <code>x</code>, <code>+ - * / ^</code>, paréntesis, <code>|x|</code>, <code>sen cos tan raiz abs ln log log2 exp senh cosh pi e</code> (<code>ln</code> es natural y <code>log</code> es base 10). Ejemplo: <code>-(x-6)^2/12 + 4.5</code>. Aquí x va de ${fmt(L.xL)} a ${fmt(L.xR)}.</small></div>`;
     }else{
       html+=`<div class="eq" id="eq"></div>
        <div class="sliders">${F.params.map((d,i)=>`<div class="sl" style="accent-color:var(--p${i})">
@@ -1056,8 +1471,9 @@ function renderBuild(){
   if(tabS)tabS.onclick=()=>{if(!isText)return;S.famId=S.baseFam;S.p={...S.baseP};renderBuild()};
   if(tabT)tabT.onclick=()=>{if(isText)return;S.baseFam=S.famId;S.baseP={...S.p};const src=aTexto(S.famId,S.p);S.famId='texto';S.p={src,fn:compilarFuncion(src)};renderBuild()};
   if(isText){
-    const inp=$('#fx-input');
+    const inp=$('#fx-input'),px=$('#fx-px');
     inp.oninput=()=>readFormula(inp.value);
+    if(px)px.onchange=()=>{S.pxMode=px.checked;readFormula(inp.value)};
     readFormula(inp.value);
   }else{
     F.params.forEach(d=>{const s=$('#sl-'+d.id);s.oninput=()=>{setParam(d.id,+s.value,d);$('#out-'+d.id).textContent=pFmt(d,S.p[d.id]);updateBuild()}});
@@ -1072,9 +1488,12 @@ function renderBuild(){
 function readFormula(text){
   const inp=$('#fx-input'),msg=$('#fx-msg');
   try{
-    const fn=compilarFuncion(text);
-    S.p={src:text.trim(),fn,invalid:false};
-    inp.className='good';msg.className='fx-msg good';msg.textContent='Fórmula válida.';
+    const L=S.level,raw=compilarFuncion(text),I=S.pxMode&&L.informe;
+    /* En unidades del informe: x_px = x0 + (x − xL)·K  y  y = f(x_px) / K */
+    const fn=I?x=>raw(I.x0+(x-L.xL)*I.K)/I.K:raw,warn=avisoDominio(fn,L.xL,L.xR);
+    S.p={src:text.trim(),fn,invalid:false,px:!!I};
+    if(warn){inp.className='warn';msg.className='fx-msg warn';msg.textContent=`Fórmula válida. ${warn}`}
+    else{inp.className='good';msg.className='fx-msg good';msg.textContent=`Fórmula válida${MJ?' (Math.js)':''}.`}
   }catch(e){
     S.p={...S.p,invalid:true};
     inp.className='bad';msg.className='fx-msg bad';msg.textContent=e.message;
@@ -1094,13 +1513,20 @@ function updateBuild(){
   if(bm){bm.classList.toggle('over',over);bm.firstElementChild.style.width=clamp(S.an.cost/L.budget*100,0,100)+'%'}
 }
 function startTest(){
-  S.an=analyze(S.level,S.famId,S.p);S.phase='test';setSteps(2);$('#panel').setAttribute('aria-live','polite');S.sim=newSim();cv.style.touchAction='auto';audio();
-  $('#panel').innerHTML=`<h2>Prueba de carga</h2><p>El camión está cruzando. Mira los colores de la calzada: verde significa poca tensión, amarillo media y rojo mucha. Los tramos lejos de un apoyo sufren más.</p><div class="eq">${FAM[S.famId].eq(S.p,S.level)}</div>${windHtml(S.level,S.an)}`;
+  S.an=analyze(S.level,S.famId,S.p);S.phase='test';setSteps(2);$('#panel').setAttribute('aria-live','polite');cv.style.touchAction='auto';audio();
+  /* Matter.js arma el mundo con la f(x) de Math.js; p5.js lo avanza y lo dibuja; el resultado vuelve a las estrellas y al informe. */
+  const sim=crearSimFisica(S.level,S.an);
+  sim.alChocar=()=>{S.crashes++;sfx.crash()};
+  sim.alGanar=onWin;
+  sim.alPerder=onFail;
+  S.sim=sim;iniciarP5();
+  $('#panel').innerHTML=`<h2>Prueba de carga</h2><p>El camión es un cuerpo físico: un chasis y dos ruedas con tracción que ruedan sobre ${sim.deck.length} vigas, una cada Δx = ${fmt(PHYS.DX)} (10 px). Mira los colores de la calzada: verde significa poca tensión, amarillo media y rojo mucha.</p><div class="eq">${FAM[S.famId].eq(S.p,S.level)}</div>${windHtml(S.level,S.an)}`;
   if(window.innerWidth<=900)window.scrollTo({top:0,behavior:REDUCED?'auto':'smooth'});
 }
 function onFail(){
   const L=S.level,i=S.sim.issue;S.hint=true;
-  $('#panel').innerHTML=`<h2>El puente cayó</h2><div class="fb bad"><strong>Qué pasó</strong>${esc(i.msg)}</div>
+  const title={stuck:'El camión no pudo subir',flip:'El camión se volcó',fall:'El camión cayó al abismo'}[i.code]||'El puente cayó';
+  $('#panel').innerHTML=`<h2>${title}</h2><div class="fb bad"><strong>Qué pasó</strong>${esc(i.msg)}</div>
    <div class="fb hint"><strong>Pista</strong>${esc(L.hint)}</div>
    <div class="eq">${FAM[S.famId].eq(S.p,L)}</div>
    <div class="row"><button class="btn primary grow" id="fix" type="button">Ajustar el puente</button></div>`;
@@ -1211,7 +1637,7 @@ function openGuide(from){
   <div class="guide">${FAM_IDS.map(id=>{const F=FAM[id];return`<article class="card"><h3>${esc(F.name)}</h3>${plotSVG(id,F.demo,DEMO_LVL,'Ejemplo de función '+F.name)}<div class="form">${esc(F.form)}</div>
     <dl><div><dt>En la gráfica</dt><dd>${esc(cap(F.shape))}.</dd></div><div><dt>En la tabla</dt><dd>${esc(cap(F.tableCue))}.</dd></div><div><dt>Dominio</dt><dd>${esc(F.dom)}</dd></div><div><dt>En la vida real</dt><dd>${esc(F.life)}</dd></div></dl></article>`}).join('')}</div>`;
   show('guide');
-  $('#gd-back').onclick=()=>{if(from==='game'){show('game');mountCanvas($('#stage'))}else goMenu()};
+  $('#gd-back').onclick=()=>{if(from==='game'){show('game');mountCanvas($('#stage'));if(S.phase==='test')enterBuild()}else goMenu()};
 }
 
 /* ---------- informe ---------- */
