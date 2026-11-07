@@ -92,7 +92,8 @@
     .row{display:flex;flex-wrap:wrap;gap:10px}
     .libs{display:grid;gap:8px}
     .libs li{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--panel)}
-    .libs code{color:var(--p1);font-size:.9rem}
+    .libs li span{font-weight:700}
+    .team-t{font:700 .8rem/1.2 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
     /* pantalla de despedida */
     .bye{position:fixed;inset:0;z-index:10;display:grid;place-content:center;justify-items:center;gap:14px;padding:24px;text-align:center;background:var(--sheet);
@@ -103,7 +104,7 @@
 
     @media (max-height:640px){.shell{align-content:start}.title{font-size:clamp(2.4rem,9vw,5rem)}.item{min-height:46px}.item.primary{min-height:52px}}
     @media (hover:none){.keys{display:none}}
-    @media (max-width:520px){.foot{justify-content:center;text-align:center}.foot .v{display:none}}
+    @media (max-width:520px){.foot{justify-content:center;text-align:center}}
   </style>
 </head>
 <body>
@@ -135,7 +136,6 @@
 
 <footer class="foot">
   <span>Universidad Autónoma de Occidente · Proyecto integrador</span>
-  <span class="v">Math.js · Matter.js · p5.js</span>
 </footer>
 
 <!-- Cómo jugar -->
@@ -171,10 +171,11 @@
   <div class="dlg-body">
     <p><b>Function Bridge</b>: un simulador para aprender funciones construyendo puentes.</p>
     <p class="note">Proyecto integrador del curso de Matemáticas Fundamentales, Universidad Autónoma de Occidente.</p>
+    <h3 class="team-t">Equipo de desarrollo</h3>
     <ul class="libs">
-      <li><span>Motor algebraico</span><code>Math.js 12.4.3</code></li>
-      <li><span>Física 2D</span><code>Matter.js 0.19.0</code></li>
-      <li><span>Dibujo de la prueba</span><code>p5.js 1.9.4</code></li>
+      <li><span>Samuel Lugo Lozada</span></li>
+      <li><span>Juan Camilo Leiton</span></li>
+      <li><span>Alejandro Manriquez</span></li>
     </ul>
   </div>
 </dialog>
@@ -190,7 +191,6 @@
 
 <section class="bye" id="bye" hidden aria-live="polite">
   <h2>¡Hasta la próxima <span>obra</span>!</h2>
-  <p>El navegador no deja que una página cierre su propia pestaña. Ya puedes cerrarla con Ctrl+W o con la ✕ de la pestaña.</p>
   <button class="btn primary" type="button" id="bye-back">Volver al menú</button>
 </section>
 

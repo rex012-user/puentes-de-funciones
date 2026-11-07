@@ -1,0 +1,26 @@
+# Dependencias y compilados (por si se agregan herramientas más adelante)
+node_modules/
+dist/
+build/
+.cache/
+*.log
+npm-debug.log*
+
+# Archivos del sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+._*
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*~
+
+# Configuración local de herramientas (servidor de vista previa)
+.claude/
+
+# Variables de entorno
+.env
+.env.*
