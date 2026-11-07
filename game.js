@@ -1,4 +1,4 @@
-/* Puentes de Funciones: lógica del juego */
+/* Function Bridge: lógica del juego */
 "use strict";
 /* ---------- utilidades ---------- */
 const TOL=.15,MAX_SLOPE=2.2,WATER=-2,PRICE=100;
@@ -1354,7 +1354,7 @@ function renderMenu(){
   const total=Object.values(P.levels).reduce((a,r)=>a+(r.stars||0),0);
   $('#s-menu').innerHTML=`
    <div class="hero">
-     <h1>Puentes de <span>Funciones</span></h1>
+     <h1>Function <span>Bridge</span></h1>
      <p class="lede">Cada puente es la gráfica de una función. Reconoce qué tipo de función pide el plano, ajusta sus parámetros hasta que pase por las orillas y los pilares, y manda el camión a probarlo.</p>
      <div class="hero-stage" id="hero-stage"></div>
      <div class="hero-actions">
@@ -1362,6 +1362,7 @@ function renderMenu(){
        <button class="btn" id="go-exam" type="button">Examen del inspector</button>
        <button class="btn" id="go-guide" type="button">Guía de funciones</button>
        <button class="btn" id="go-report" type="button">Informe de obra</button>
+       <a class="btn" href="menu.html">Menú principal</a>
      </div>
    </div>
    <div class="section-head"><h2>Obras</h2>

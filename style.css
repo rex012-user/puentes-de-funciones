@@ -1,4 +1,4 @@
-/* Puentes de Funciones: hoja de estilos */
+/* Function Bridge: hoja de estilos */
 :root{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;padding:0}
@@ -31,6 +31,7 @@ h1,h2,h3{text-wrap:balance}
 .btn:active{transform:translateY(1px)}
 .btn:focus-visible{outline:3px solid var(--paper);outline-offset:-5px}
 .btn.primary{--bc:var(--tape);--fc:var(--tape-ink)}
+a.btn{text-decoration:none}
 .btn.small{min-height:36px;font-size:.9rem;padding:.35em .8em}
 .btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
 .link{background:none;border:0;padding:0;color:var(--p1);font:inherit;text-decoration:underline;cursor:pointer}
