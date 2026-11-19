@@ -235,7 +235,6 @@ function aTexto(id,p){
     case'logaritmica':return`${nTxt(p.a)}*log2(${shTxt(p.h)})${tlTxt(p.k)}`;
     case'racional':return`${nTxt(p.a)}/(${shTxt(p.h)})${tlTxt(p.k)}`;
     case'seno':return`${nTxt(p.a)}*sen(${piTxt(p.n)}*(${shTxt(p.h)}))${tlTxt(p.k)}`;
-    case'catenaria':return`${nTxt(p.a)}*cosh((${shTxt(p.h)})/${nTxt(p.a)})${tlTxt(p.c)}`;
     default:return'';
   }
 }
@@ -246,18 +245,18 @@ const shift=(i,h)=>near0(h)?'x':h>0?`x − ${V(i,h)}`:`x + ${V(i,h,1)}`;
 const tail=(i,k)=>near0(k)?'':k>0?` + ${V(i,k)}`:` − ${V(i,k,1)}`;
 const gcd=(a,b)=>b?gcd(b,a%b):a;
 const fmtPi=n=>{n=Math.round(n);if(n===0)return'0';const g=gcd(n,12),a=n/g,b=12/g;return`${a===1?'':a}π${b===1?'':'/'+b}`};
-const PARAMS={h:{id:'h',min:-4,max:14,step:.5,role:'mueve la curva a izquierda o derecha'},k:{id:'k',min:-2,max:7,step:.5,role:'sube o baja toda la curva'}};
+const PARAMS={h:{id:'h',min:-4,max:14,step:.1,role:'mueve la curva a izquierda o derecha'},k:{id:'k',min:-2,max:7,step:.1,role:'sube o baja toda la curva'}};
 
 /* ---------- las familias de funciones ---------- */
 const FAM={
  constante:{name:'Constante',
-  params:[{id:'k',min:-1,max:7,step:.5,role:'la altura de toda la recta'}],def:{k:1},
+  params:[{id:'k',min:-1,max:7,step:.1,role:'la altura de toda la recta'}],def:{k:1},
   f:(x,p)=>p.k, eq:p=>`y = ${V(0,p.k)}`, form:'y = k', handle:{y:'k',fix:'mid'},
   dom:'Todos los números reales',shape:'es una recta horizontal: la altura nunca cambia',tableCue:'todos los valores de y son iguales, sin importar x',
   life:'Una tarifa fija: pagas lo mismo sin importar cuánto uses.',demo:{k:2},
   rand:()=>({k:pick([-3,-2,-1,1,2,3,4])}),tableX:()=>[0,1,2,3,4]},
  lineal:{name:'Lineal',
-  params:[{id:'m',min:-2,max:2,step:.1,role:'la pendiente: cuánto sube y por cada unidad de x'},{id:'b',min:-2,max:7,step:.5,role:'dónde corta el eje y'}],def:{m:0,b:3},
+  params:[{id:'m',min:-2,max:2,step:.1,role:'la pendiente: cuánto sube y por cada unidad de x'},{id:'b',min:-2,max:7,step:.1,role:'dónde corta el eje y'}],def:{m:0,b:3},
   f:(x,p)=>p.m*x+p.b, eq:p=>`y = ${V(0,p.m)}x${tail(1,p.b)}`, form:'y = mx + b', handle:{y:'b',fix:0},
   dom:'Todos los números reales',shape:'es una recta inclinada: su pendiente es igual en todas partes',tableCue:'el cambio de y es siempre el mismo cuando x avanza lo mismo',
   life:'Un taxi: un valor de arranque más un valor fijo por kilómetro.',demo:{m:.75,b:-1},
@@ -281,27 +280,27 @@ const FAM={
   life:'El volumen de una caja cúbica según la medida de su lado.',demo:{a:.1,h:0,k:0},
   rand:()=>({a:pick([-.3,-.15,-.1,.1,.15,.3]),h:rint(-2,2),k:rint(-2,2)}),tableX:p=>[-2,-1,0,1,2].map(d=>p.h+d)},
  raiz:{name:'Raíz cuadrada',
-  params:[{id:'a',min:-4,max:4,step:.25,role:'estira la curva; si es negativa, baja en vez de subir'},{id:'h',...PARAMS.h,min:-4,max:12,role:'mueve el punto de arranque. La función no existe para x < h'},{id:'k',...PARAMS.k,role:'sube o baja el punto de arranque'}],def:{a:1,h:3,k:0},
+  params:[{id:'a',min:-4,max:4,step:.1,role:'estira la curva; si es negativa, baja en vez de subir'},{id:'h',...PARAMS.h,min:-4,max:12,role:'mueve el punto de arranque. La función no existe para x < h'},{id:'k',...PARAMS.k,role:'sube o baja el punto de arranque'}],def:{a:1,h:3,k:0},
   f:(x,p)=>x<p.h?NaN:p.a*Math.sqrt(x-p.h)+p.k, eq:p=>`y = ${V(0,p.a)}√(${shift(1,p.h)})${tail(2,p.k)}`, form:'y = a√(x − h) + k', handle:{x:'h',y:'k'},
   dom:'x ≥ h',shape:'arranca en un punto, crece rápido al inicio y cada vez más despacio; no existe a la izquierda del arranque',tableCue:'si x − h es 0, 1, 4, 9, y avanza en pasos iguales',
   life:'La velocidad de un objeto al caer según la altura recorrida.',demo:{a:2,h:-4,k:-3},
   domNote:p=>`La raíz solo existe cuando x ≥ h. Con h = ${fmt(p.h)}, no hay puente a la izquierda de x = ${fmt(p.h)}.`,
   rand:()=>({a:pick([-2,-1.5,1,1.5,2]),h:rint(-5,-1),k:rint(-3,1)}),tableX:p=>[0,1,4,9,16].map(d=>p.h+d)},
  exponencial:{name:'Exponencial',
-  params:[{id:'a',min:-6,max:6,step:.25,role:'el valor inicial sobre la asíntota (cuando x = 0)'},{id:'b',min:.5,max:2,step:.05,role:'el factor: mayor que 1 crece, menor que 1 decae'},{id:'c',min:-2,max:6,step:.5,role:'la altura de la asíntota horizontal'}],def:{a:1,b:1.2,c:1},
+  params:[{id:'a',min:-8,max:8,step:.1,role:'el valor inicial sobre la asíntota (cuando x = 0)'},{id:'b',min:.5,max:2,step:.01,role:'el factor: mayor que 1 crece, menor que 1 decae'},{id:'c',min:-2,max:6,step:.1,role:'la altura de la asíntota horizontal'}],def:{a:1,b:1.2,c:1},
   f:(x,p)=>p.a*Math.pow(p.b,x)+p.c, eq:p=>`y = ${V(0,p.a)} · ${V(1,p.b)}<sup>x</sup>${tail(2,p.c)}`, form:'y = a · bˣ + c', handle:{y:'c',fix:'right'},
   dom:'Todos los números reales',shape:'crece o decae cada vez más rápido y por un lado se pega a una asíntota horizontal',tableCue:'cuando x aumenta 1, y se multiplica siempre por el mismo factor',
   life:'El interés compuesto o el crecimiento de una población.',demo:{a:1,b:1.5,c:-3},
   rand:()=>({a:pick([-1,1,2,.5]),b:pick([1.5,2,.5,.75]),c:rint(-2,2)}),tableX:()=>[0,1,2,3,4]},
  logaritmica:{name:'Logarítmica',
-  params:[{id:'a',min:-4,max:4,step:.25,role:'estira la curva; si es negativa, se voltea'},{id:'h',...PARAMS.h,min:-4,max:12,role:'mueve la asíntota vertical. La función no existe para x ≤ h'},{id:'k',...PARAMS.k,role:'sube o baja toda la curva'}],def:{a:1,h:2,k:1},
+  params:[{id:'a',min:-4,max:4,step:.1,role:'estira la curva; si es negativa, se voltea'},{id:'h',...PARAMS.h,min:-4,max:12,role:'mueve la asíntota vertical. La función no existe para x ≤ h'},{id:'k',...PARAMS.k,role:'sube o baja toda la curva'}],def:{a:1,h:2,k:1},
   f:(x,p)=>x<=p.h?NaN:p.a*Math.log2(x-p.h)+p.k, eq:p=>`y = ${V(0,p.a)} · log₂(${shift(1,p.h)})${tail(2,p.k)}`, form:'y = a · log₂(x − h) + k', handle:{x:'h',y:'k',dx:1},
   dom:'x > h',shape:'sale de una asíntota vertical, sube rápido y luego casi se aplana, sin dejar de crecer',tableCue:'cuando x − h se duplica, y aumenta siempre la misma cantidad',
   life:'La escala de los sismos o el pH de una sustancia.',demo:{a:2,h:-5,k:-3},
   domNote:p=>`El logaritmo solo existe cuando x > h. Con h = ${fmt(p.h)}, no hay puente a la izquierda de x = ${fmt(p.h)}.`,
   rand:()=>({a:pick([-2,-1,1,2,3]),h:rint(-5,-1),k:rint(-2,2)}),tableX:p=>[1,2,4,8,16].map(d=>p.h+d)},
  racional:{name:'Racional',
-  params:[{id:'a',min:-10,max:10,step:.5,role:'aleja o acerca las ramas de las asíntotas'},{id:'h',...PARAMS.h,role:'la asíntota vertical. La función no existe en x = h'},{id:'k',...PARAMS.k,role:'la asíntota horizontal'}],def:{a:2,h:6,k:3},
+  params:[{id:'a',min:-10,max:10,step:.1,role:'aleja o acerca las ramas de las asíntotas'},{id:'h',...PARAMS.h,role:'la asíntota vertical. La función no existe en x = h'},{id:'k',...PARAMS.k,role:'la asíntota horizontal'}],def:{a:2,h:6,k:3},
   f:(x,p)=>near0(x-p.h)?NaN:p.a/(x-p.h)+p.k, eq:p=>`y = <span class="frac"><span>${V(0,p.a)}</span><span>${shift(1,p.h)}</span></span>${tail(2,p.k)}`, form:'y = a / (x − h) + k', handle:{x:'h',y:'k'},
   breaks:p=>[p.h],
   dom:'x ≠ h',shape:'tiene dos ramas separadas por una asíntota vertical y otra horizontal',tableCue:'el producto de x por y es constante (cuando h = 0 y k = 0)',
@@ -309,19 +308,13 @@ const FAM={
   domNote:p=>`La división entre cero no existe: hay una asíntota vertical en x = ${fmt(p.h)}. Llévala fuera del tramo del puente.`,
   rand:()=>({a:pick([-4,-2,-1,1,2,4]),h:rint(-2,2),k:rint(-2,2)}),tableX:()=>[1,2,4,5,10]},
  seno:{name:'Trigonométrica (seno)',
-  params:[{id:'a',min:-4,max:4,step:.5,role:'la amplitud: cuánto se aleja de la línea media'},{id:'n',label:'b',min:1,max:24,step:1,format:fmtPi,role:'la frecuencia: periodo = 2π / b'},{id:'h',min:-6,max:6,step:.5,role:'desplaza la onda a izquierda o derecha'},{id:'k',...PARAMS.k,role:'la línea media de la onda'}],def:{a:1,n:4,h:2,k:2},
+  params:[{id:'a',min:-4,max:4,step:.1,role:'la amplitud: cuánto se aleja de la línea media'},{id:'n',label:'b',min:1,max:24,step:1,format:fmtPi,role:'la frecuencia: periodo = 2π / b'},{id:'h',min:-6,max:6,step:.1,role:'desplaza la onda a izquierda o derecha'},{id:'k',...PARAMS.k,role:'la línea media de la onda'}],def:{a:1,n:4,h:2,k:2},
   f:(x,p)=>p.a*Math.sin(p.n*Math.PI/12*(x-p.h))+p.k, eq:p=>`y = ${V(0,p.a)} · sen(<b class="p1">${fmtPi(p.n)}</b>(${shift(2,p.h)}))${tail(3,p.k)}`, form:'y = a · sen(b(x − h)) + k', handle:{x:'h',y:'k'},
   dom:'Todos los números reales',shape:'es una onda que se repite: siempre oscila entre un máximo y un mínimo',tableCue:'los valores de y se repiten cada cierto intervalo de x',
   life:'Las mareas, el sonido y la corriente eléctrica de una casa.',demo:{a:3,n:6,h:0,k:0},
   rand:()=>({a:pick([-3,-2,1,2,3]),n:pick([4,6,8,12]),h:rint(-1,1),k:rint(-1,1)}),tableX:p=>{const P=24/p.n;return[0,.25,.5,.75,1,1.25].map(t=>p.h+P*t)}},
- catenaria:{name:'Catenaria',
-  params:[{id:'a',min:2,max:12,step:.5,role:'qué tan abierta es la curva: más grande, más plana'},{id:'h',...PARAMS.h,role:'mueve el punto más bajo a izquierda o derecha'},{id:'c',min:-10,max:6,step:.5,role:'sube o baja la curva; el punto más bajo queda en y = a + c'}],def:{a:4,h:4,c:-2},
-  f:(x,p)=>p.a*Math.cosh((x-p.h)/p.a)+p.c, eq:p=>`y = ${V(0,p.a)} · cosh((${shift(1,p.h)}) / ${V(0,p.a)})${tail(2,p.c)}`, form:'y = a · cosh((x − h) / a) + c', handle:{x:'h',y:'c',dy:p=>p.a},
-  dom:'Todos los números reales',shape:'es la curva de un cable que cuelga por su propio peso: simétrica como una parábola, pero combina dos exponenciales',tableCue:'los valores de y son simétricos alrededor del centro y ni sus primeras ni sus segundas diferencias son constantes',
-  life:'Un cable de luz o una cadena que cuelga entre dos postes.',demo:{a:2,h:0,c:-4},
-  rand:()=>({a:pick([1.5,2,3]),h:rint(-1,1),c:rint(-5,-3)}),tableX:p=>[-2,-1,0,1,2].map(d=>p.h+d)},
  tramos:{name:'Por tramos',
-  params:[{id:'m1',label:'m₁',min:-2,max:2,step:.25,role:'pendiente del primer tramo'},{id:'b1',label:'b₁',min:-2,max:8,step:.5,role:'corte con y del primer tramo'},{id:'k',min:-2,max:7,step:.5,role:'altura del tramo central'},{id:'m2',label:'m₂',min:-2,max:2,step:.25,role:'pendiente del último tramo'},{id:'b2',label:'b₂',min:-4,max:14,step:.5,role:'corte con y del último tramo'}],def:{m1:0,b1:2,k:3,m2:0,b2:2},
+  params:[{id:'m1',label:'m₁',min:-2,max:2,step:.1,role:'pendiente del primer tramo'},{id:'b1',label:'b₁',min:-2,max:8,step:.1,role:'corte con y del primer tramo'},{id:'k',min:-2,max:7,step:.1,role:'altura del tramo central'},{id:'m2',label:'m₂',min:-2,max:2,step:.1,role:'pendiente del último tramo'},{id:'b2',label:'b₂',min:-4,max:14,step:.1,role:'corte con y del último tramo'}],def:{m1:0,b1:2,k:3,m2:0,b2:2},
   f:(x,p,L)=>{const[a,b]=L.breaks;return x<a?p.m1*x+p.b1:x<=b?p.k:p.m2*x+p.b2},
   eq:(p,L)=>{const[a,b]=L.breaks;return`y = <span class="cases"><span>${V(0,p.m1)}x${tail(1,p.b1)}</span><span>x &lt; ${fmt(a)}</span><span>${V(2,p.k)}</span><span>${fmt(a)} ≤ x ≤ ${fmt(b)}</span><span>${V(3,p.m2)}x${tail(4,p.b2)}</span><span>x &gt; ${fmt(b)}</span></span>`},
   form:'y = { una fórmula en cada intervalo', handle:{y:'k',fix:'mid'},breaks:(p,L)=>L.breaks,
@@ -342,13 +335,14 @@ const REG={
  costa:{label:'Costa',sky:['#F28F6F','#FFE3AC'],mt:['#B85C7E','#8D4168'],rock:['#5C2E4E','#4A2340','#6E3A5C','#3A1B33','#80476A'],grass:'#E1A24A',tree:['#2F5D5A','#214845'],water:['#214670','#2F6796','#F9BE96'],ink:'#26102C',sun:'#FFF3C0'},
 };
 
-/* ---------- las 14 obras ---------- */
+/* ---------- las 13 obras ---------- */
 const LEVELS=[
- {n:1,id:'vado',name:'El vado',region:'canon',fam:'constante',rep:'graph',sol:{k:3},start:{k:1},xL:0,xR:12,pillars:[6],obs:[{t:'boat',x:3,y:2}],
-  opts:['constante','lineal','cuadratica','absoluto'],
+ {n:1,id:'vado',name:'El vado',region:'canon',fam:'lineal',rep:'graph',sol:{m:0,b:3},start:{m:.5,b:1},xL:0,xR:12,pillars:[6],obs:[{t:'boat',x:3,y:2}],
+  opts:['lineal','absoluto','cuadratica','exponencial'],
   story:'Las dos orillas están a la misma altura y el camión de suministros necesita cruzar sin subir ni bajar.',
-  why:'La altura es la misma en todos los puntos, sin importar x. Esa es la marca de la función constante.',
-  hint:'Esta función tiene un solo número: k. Lee en la cuadrícula a qué altura está el borde de la orilla.'},
+  why:'La línea blanca es la recta y = 3: una función lineal con pendiente 0, es decir, y = 0x + 3. Como m = 0, la recta no sube ni baja y la altura es 3 en todos los puntos, sin importar x.',
+  recog:'es una recta. Si su pendiente m es 0, la recta queda horizontal (y = 0x + b) y la altura es la misma en todas partes',
+  hint:'En y = mx + b, m es la pendiente y b es la altura donde la recta corta el eje y. Las orillas están a la misma altura, así que el puente no debe subir ni bajar: m = 0. Luego lee en la cuadrícula la altura del borde de la orilla para b.'},
  {n:2,id:'molino',name:'Rampa del molino',region:'canon',fam:'lineal',rep:'table',tableX:[0,2,4,6,8],sol:{m:.5,b:1},start:{m:0,b:3},xL:0,xR:12,pillars:[4,8],obs:[],
   opts:['lineal','exponencial','cuadratica','constante'],
   story:'El molino está más alto que el pueblo. La topógrafa midió cinco puntos de la rampa y dejó esta tabla.',
@@ -401,17 +395,12 @@ const LEVELS=[
   story:'Una rampa, un tramo plano y una bajada: cada parte sigue su propia regla. Los tramos cambian en x = 4 y en x = 8.',
   why:'No hay una sola fórmula que describa las tres partes. Cada intervalo tiene su propia regla.',
   hint:'Cuida la continuidad: el primer tramo debe valer k en x = 4 y el último también debe valer k en x = 8.'},
- {n:12,id:'colgante',name:'Puente colgante',region:'canon',fam:'catenaria',rep:'eq',stayed:true,sol:{a:6,h:6,c:-3},start:{a:4,h:4,c:-2},xL:0,xR:12,pillars:[3,6,9],obs:[],
-  opts:['catenaria','cuadratica','exponencial','absoluto'],
-  story:'El cañón es tan profundo que no caben pilares. La calzada cuelga de dos torres y toma la forma de un cable sostenido por sus extremos.',
-  why:'Aparece cosh, el coseno hiperbólico: cosh(u) = (eᵘ + e⁻ᵘ) / 2. Se parece a una parábola, pero es la suma de dos exponenciales.',
-  hint:'El punto más bajo está en x = h y vale a + c. Aquí a + c = 3. Cambia a y ajusta c para que esa suma siga dando 3, hasta que la curva llegue a las orillas.'},
- {n:13,id:'viento',name:'Viento del estrecho',region:'costa',fam:'seno',rep:'desc',desc:'“La calzada sale de y = 3, sube y baja con un oleaje regular, vuelve a y = 3 justo en el centro y termina en y = 3 en la otra orilla.”',wind:{omega:Math.PI/6,zeta:.08,base:.1,limit:.35,mode:2},sol:{a:2,n:4,h:0,k:3},start:{a:1,n:2,h:2,k:2},xL:0,xR:12,pillars:[6],obs:[{t:'boat',x:2,y:4}],
+ {n:12,id:'viento',name:'Viento del estrecho',region:'costa',fam:'seno',rep:'desc',desc:'“La calzada sale de y = 3, sube y baja con un oleaje regular, vuelve a y = 3 justo en el centro y termina en y = 3 en la otra orilla.”',wind:{omega:Math.PI/6,zeta:.08,base:.1,limit:.35,mode:2},sol:{a:2,n:4,h:0,k:3},start:{a:1,n:2,h:2,k:2},xL:0,xR:12,pillars:[6],obs:[{t:'boat',x:2,y:4}],
   opts:['seno','cuadratica','cubica','tramos'],
   story:'El viento del estrecho empuja el puente con una frecuencia fija. Si tu puente vibra con esa misma frecuencia, cada ráfaga aumenta la oscilación.',
   why:'La ruta se repite con regularidad alrededor de una línea media. Solo una función periódica se comporta así.',
   hint:'El viento tiene ω = π/6, así que debes evitar b = π/6. El pilar central necesita y = 3 en x = 6: prueba con b = π/3, que da un periodo de 6.'},
- {n:14,id:'maestra',name:'Obra maestra',region:'costa',fam:'exponencial',free:true,sol:{a:6,b:.75,c:1},xL:0,xR:12,pillars:[2,4,7],obs:[],
+ {n:13,id:'maestra',name:'Obra maestra',region:'costa',fam:'exponencial',free:true,sol:{a:6,b:.75,c:1},xL:0,xR:12,pillars:[2,4,7],obs:[],
   story:'Esta vez no hay plano. Solo tienes las orillas y los pilares. Observa cómo se acomodan y elige la función que pasa por todos.',
   why:'La caída se frena poco a poco y se acerca a una altura que nunca alcanza. Esa asíntota horizontal delata a la exponencial.',
   hint:'Mira los pilares: la caída se frena, nunca vuelve a subir y parece acercarse a y = 1. ¿Qué función tiene una asíntota horizontal?'},
@@ -469,8 +458,8 @@ function analyze(L,famId,p){
   /* pilares */
   L.pts.forEach(pt=>{
     const y=f(pt.x),ok=y!==null&&Math.abs(y-pt.y)<=TOL;
-    rows.push({label:`${L.stayed?'Tirante':'Pilar'}, x = ${fmt(pt.x)}`,ok,val:`${y===null?'no existe':fmt(y)} / ${fmt(pt.y)}`,pt});
-    if(!ok&&y!==null)add(pt.x,'pillar',L.stayed?`En x = ${fmt(pt.x)} tu función vale ${fmt(y)} y el tirante sostiene la calzada en y = ${fmt(pt.y)}. El tirante se revienta con el peso del camión.`:`En x = ${fmt(pt.x)} tu función vale ${fmt(y)} y el pilar llega hasta y = ${fmt(pt.y)}. ${y>pt.y?'Sin apoyo, el puente se parte bajo el peso del camión.':'El pilar atraviesa la vía y el camión choca.'}`);
+    rows.push({label:`Pilar, x = ${fmt(pt.x)}`,ok,val:`${y===null?'no existe':fmt(y)} / ${fmt(pt.y)}`,pt});
+    if(!ok&&y!==null)add(pt.x,'pillar',`En x = ${fmt(pt.x)} tu función vale ${fmt(y)} y el pilar llega hasta y = ${fmt(pt.y)}. ${y>pt.y?'Sin apoyo, el puente se parte bajo el peso del camión.':'El pilar atraviesa la vía y el camión choca.'}`);
   });
   /* obstáculos */
   L.obs.forEach(o=>{
@@ -670,6 +659,7 @@ function windHtml(L,an){
 const KEY='puentes-funciones-v1';
 let P={name:'',levels:{},examBest:null,unlockAll:false,sound:true};
 try{const raw=localStorage.getItem(KEY);if(raw)P={...P,...JSON.parse(raw)}}catch(e){}
+if(P.levels&&P.levels.colgante)delete P.levels.colgante;
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(P))}catch(e){}};
 /* Una obra se abre solo cuando todas las anteriores tienen al menos una estrella (o con el desbloqueo docente). */
 const unlocked=L=>P.unlockAll||LEVELS.slice(0,L.n-1).every(A=>P.levels[A.id]&&P.levels[A.id].stars);
@@ -800,16 +790,6 @@ function drawPillar(pt,ok,show){
   poly(ctx,[[cx,top],[cx+hw,top],[cx+hwB,bot],[cx,bot]],'#8D877B');
   const col=show?(ok?'#2CCB86':'#FF8F24'):'#D5CFC2';
   poly(ctx,[[cx-hw*1.5,top-.04*SC],[cx+hw*1.5,top-.04*SC],[cx+hw*1.2,top+.16*SC],[cx-hw*1.2,top+.16*SC]],col);
-}
-function drawTowers(L){
-  const top=Math.max(L.yL,L.yR)+1.1,hw=.16*SC;
-  [[L.xL,L.yL],[L.xR,L.yR]].forEach(([x,y])=>{
-    const cx=X(x);
-    ctx.strokeStyle='#232B38';ctx.lineWidth=Math.max(1,.035*SC);ctx.beginPath();
-    L.pts.filter(pt=>Math.abs(pt.x-x)<=(L.xR-L.xL)/2).forEach(pt=>{ctx.moveTo(cx,Y(top));ctx.lineTo(X(pt.x),Y(pt.y))});ctx.stroke();
-    poly(ctx,[[cx-hw,Y(top)],[cx,Y(top)],[cx,Y(y)],[cx-hw*1.4,Y(y)]],'#B7B0A3');
-    poly(ctx,[[cx,Y(top)],[cx+hw,Y(top)],[cx+hw*1.4,Y(y)],[cx,Y(y)]],'#8D877B');
-  });
 }
 function drawWind(t){
   ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=Math.max(1.2,.04*SC);ctx.lineCap='round';
@@ -974,8 +954,7 @@ function dibujarEscena(t){
   if(building||ident)drawGrid(L);
   L.obs.forEach(o=>{if(o.t==='boat')drawBoat(o,t)});
   /* pilares */
-  if(L.stayed)drawTowers(L);
-  else L.pts.forEach(pt=>{const r=S.an?S.an.rows.find(x=>x.pt===pt):null;drawPillar(pt,r&&r.ok,building)});
+  L.pts.forEach(pt=>{const r=S.an?S.an.rows.find(x=>x.pt===pt):null;drawPillar(pt,r&&r.ok,building)});
   if(building)guides();
   L.obs.forEach(o=>{if(o.t==='cable')drawCable(o,t)});
   if(ident&&L.rep==='graph')drawPlan(L);
@@ -1047,8 +1026,9 @@ cv.addEventListener('pointermove',e=>{
   if(!dragging){if(S.screen==='game'&&S.phase==='build'){const h=handlePos();cv.style.cursor=h&&Math.hypot(px-X(h.x),py-Y(h.y))<30?'grab':'default'}return}
   const F=FAM[S.famId],H0=F.handle;
   const defOf=id=>F.params.find(q=>q.id===id);
-  if(H0.x){const d=defOf(H0.x);setParam(H0.x,IX(px)-(H0.dx||0),d)}
-  const d=defOf(H0.y);setParam(H0.y,IY(py)-(H0.dy?H0.dy(S.p):0),d);
+  /* el punto blanco se mueve en pasos de 0.1 */
+  if(H0.x){const d=defOf(H0.x);setParam(H0.x,IX(px)-(H0.dx||0),d,Math.max(d.step,.1))}
+  const d=defOf(H0.y);setParam(H0.y,IY(py)-(H0.dy?H0.dy(S.p):0),d,Math.max(d.step,.1));
   syncSliders();updateBuild();
 });
 const endDrag=()=>{dragging=false};cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
@@ -1222,7 +1202,7 @@ function dibujarPrueba(sk,t,sim){
   aguaP5(sk,t,false);
   mallaP5(sk,L);
   L.obs.forEach(o=>{if(o.t==='boat')barcoP5(sk,o,t)});
-  if(L.stayed)torresP5(sk,L);else L.pts.forEach(pt=>{const r=sim.an.rows.find(q=>q.pt===pt);pilarP5(sk,pt,r&&r.ok)});
+  L.pts.forEach(pt=>{const r=sim.an.rows.find(q=>q.pt===pt);pilarP5(sk,pt,r&&r.ok)});
   L.obs.forEach(o=>{if(o.t==='cable')cableP5(sk,o,t)});
   orillasP5(sk,sim);
   tableroP5(sk,sim);
@@ -1255,15 +1235,6 @@ function pilarP5(sk,pt,ok){
   pPoly(sk,[[cx-hw,top],[cx,top],[cx,bot],[cx-hwB,bot]],'#B7B0A3');
   pPoly(sk,[[cx,top],[cx+hw,top],[cx+hwB,bot],[cx,bot]],'#8D877B');
   pPoly(sk,[[cx-hw*1.5,top-.04*SC],[cx+hw*1.5,top-.04*SC],[cx+hw*1.2,top+.16*SC],[cx-hw*1.2,top+.16*SC]],ok?'#2CCB86':'#FF8F24');
-}
-function torresP5(sk,L){
-  const top=Math.max(L.yL,L.yR)+1.1,hw=.16*SC;
-  [[L.xL,L.yL],[L.xR,L.yR]].forEach(([x,y])=>{
-    const cx=X(x);sk.stroke('#232B38');sk.strokeWeight(Math.max(1,.035*SC));
-    L.pts.filter(pt=>Math.abs(pt.x-x)<=(L.xR-L.xL)/2).forEach(pt=>sk.line(cx,Y(top),X(pt.x),Y(pt.y)));
-    pPoly(sk,[[cx-hw,Y(top)],[cx,Y(top)],[cx,Y(y)],[cx-hw*1.4,Y(y)]],'#B7B0A3');
-    pPoly(sk,[[cx,Y(top)],[cx+hw,Y(top)],[cx+hw*1.4,Y(y)],[cx,Y(y)]],'#8D877B');
-  });
 }
 function barcoP5(sk,o,t){
   const u=SC,mh=(o.y-WATER)*u,sailTop=mh-.12*u;
@@ -1386,7 +1357,7 @@ function goMenu(){show('menu');renderMenu()}
 /* obra */
 function startLevel(L){
   S.level=L;S.idWrong=0;S.crashes=0;S.idDone=false;S.hint=false;S.sim=null;S.an=null;bg=null;S.pxMode=false;
-  S.famId=L.fam;S.p=L.free?{}:{...L.start};S.baseFam=null;S.baseP=null;
+  S.famId=L.fam;S.p=L.free?{}:{...L.start};S.baseFam=null;S.baseP=null;S.maxStep=0;S.step=-1;
   VC=(L.xL+L.xR)/2;
   $('#g-where').textContent=`Obra ${L.n} de ${LEVELS.length} · ${L.reg.label}`;
   $('#g-name').textContent=L.name;
@@ -1395,7 +1366,30 @@ function startLevel(L){
   mountCanvas($('#stage'));
   if(L.free){S.idDone=true;S.famId=null;enterBuild()}else enterIdentify();
 }
-function setSteps(i){document.querySelectorAll('#g-steps li').forEach((li,n)=>{li.className=n===i?'on':n<i?'done':''})}
+/* Pestañas de pasos: S.maxStep es el paso más avanzado que ya se desbloqueó (0 Reconoce, 1 Construye, 2 Prueba).
+   Se puede volver a cualquier paso desbloqueado, pero no saltar a uno que todavía no se ha alcanzado. */
+const canTest=()=>!!S.famId&&!(S.famId==='texto'&&(!S.p.fn||S.p.invalid));
+function stepOpen(n){
+  const L=S.level;if(!L)return false;
+  if(n===0)return!L.free;
+  if(n===1)return S.maxStep>=1;
+  return S.maxStep>=2&&canTest();
+}
+function setSteps(i){
+  S.step=i;S.maxStep=Math.max(S.maxStep||0,i);
+  document.querySelectorAll('#g-steps li').forEach((li,n)=>{
+    li.className=n===i?'on':n<=S.maxStep?'done':'';
+    const b=li.querySelector('button');if(!b)return;
+    b.disabled=n!==i&&!stepOpen(n);
+    if(n===i)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');
+    b.title=b.disabled?(n===2?'Primero construye y prueba el puente desde «Construye»':'Primero completa el paso anterior'):'';
+  });
+}
+function refreshSteps(){if(S.screen==='game'&&S.level)setSteps(S.step)}
+function goStep(n){
+  if(S.screen!=='game'||n===S.step||!stepOpen(n))return;
+  if(n===0)enterIdentify();else if(n===1)enterBuild();else startTest();
+}
 function repHtml(L){
   if(L.rep==='graph')return`<p class="ask">Mira la línea blanca del plano. ¿Qué tipo de función es?</p>`;
   if(L.rep==='table')return`<div class="table-wrap">${tableHtml(L.tableX,L.tableX.map(x=>FAM[L.fam].f(x,L.sol,L)))}</div><p class="ask">Busca el patrón en los valores de y. ¿Qué tipo de función es?</p>`;
@@ -1410,26 +1404,44 @@ function enterIdentify(){
    <div id="id-fb"></div>
    <p><button class="link" id="id-guide" type="button">Consultar la guía de funciones</button></p>`;
   $('#id-guide').onclick=()=>openGuide('game');
+  /* Si ya se respondió bien antes, las opciones se pueden volver a contestar; un error en este repaso
+     no cuenta para las estrellas ni borra lo que ya se construyó en «Construye». */
+  const review=S.idDone;
+  if(review)$('#id-fb').innerHTML=`<div class="fb hint">Ya reconociste esta función. Puedes responder otra vez para repasar; tu puente en «Construye» se conserva.</div>`;
   document.querySelectorAll('#choices .choice').forEach(b=>{b.onclick=()=>{
     const o=b.dataset.o;
     if(o===L.fam){
       sfx.right();b.classList.add('right');S.idDone=true;
       document.querySelectorAll('#choices .choice').forEach(x=>x.disabled=true);
-      $('#id-fb').innerHTML=`<div class="fb good"><strong>Correcto: ${esc(fullName(o))}</strong>${esc(L.why)}</div><div class="row" style="margin-top:10px"><button class="btn primary grow" id="to-build" type="button">Construir el puente</button></div>`;
+      $('#id-fb').innerHTML=`<div class="fb good"><strong>Correcto: ${esc(fullName(o))}</strong>${esc(L.why)}</div><div class="row" style="margin-top:10px"><button class="btn primary grow" id="to-build" type="button">${review?'Volver a construir el puente':'Construir el puente'}</button></div>`;
       $('#to-build').onclick=enterBuild;$('#to-build').focus({preventScroll:true});
+      S.maxStep=Math.max(S.maxStep,1);refreshSteps();
     }else{
-      sfx.wrong();S.idWrong++;b.classList.add('wrong');b.disabled=true;
+      sfx.wrong();if(!review)S.idWrong++;b.classList.add('wrong');b.disabled=true;
       const txt=L.rep==='table'?`En la tabla de esa función, ${FAM[o].tableCue}`:L.rep==='eq'?`Esa función tiene la forma ${FAM[o].form}`:`Esa función ${FAM[o].shape}`;
       $('#id-fb').innerHTML=`<div class="fb bad"><strong>No es ${esc(FAM[o].name.toLowerCase())}</strong>${esc(txt)}. Compáralo con lo que tienes y prueba otra vez.</div>`;
     }
   }});
 }
-function setParam(id,val,d){
-  const r=Math.round((clamp(val,d.min,d.max)-d.min)/d.step)*d.step+d.min;
-  S.p[id]=Math.round(r*1e4)/1e4;
+/* Ajusta un parámetro al rango [min, max] y a una cuadrícula de paso `grid` (por omisión, el paso del deslizador).
+   Con grid = 0.01 se respeta lo que el jugador escribe en el campo numérico (hasta 2 decimales). */
+const r2=v=>{v=Math.round(v*100)/100;return near0(v)?0:v};
+function setParam(id,val,d,grid){
+  if(!Number.isFinite(val))return;
+  const g=grid||d.step,v=clamp(val,d.min,d.max);
+  S.p[id]=clamp(r2(Math.round((v-d.min)/g)*g+d.min),d.min,d.max);
 }
 const pFmt=(d,v)=>d.format?d.format(v):fmt(v);
-function syncSliders(){const F=FAM[S.famId];if(!F)return;F.params.forEach(d=>{const s=$('#sl-'+d.id),o=$('#out-'+d.id);if(s)s.value=S.p[d.id];if(o)o.textContent=pFmt(d,S.p[d.id])})}
+/* Texto del campo numérico: punto decimal y signo normal para que el navegador lo acepte. */
+const numTxt=(d,v)=>d.format?d.format(v):String(r2(v));
+/* Lee lo que se escribió en el campo. La frecuencia b del seno se escribe como múltiplo de π (π/6, 2pi/12, 0.52…). */
+function readNum(d,txt){
+  txt=String(txt).trim().replace(/,/g,'.').replace(/[−–]/g,'-');
+  if(!txt)return NaN;
+  if(d.format){try{const v=compilarFuncion(txt)(0);return Number.isFinite(v)?Math.round(v/(Math.PI/12)):NaN}catch(e){return NaN}}
+  return/^[-+]?(\d+\.?\d*|\.\d+)$/.test(txt)?parseFloat(txt):NaN;
+}
+function syncSliders(skip){const F=FAM[S.famId];if(!F||!F.params)return;F.params.forEach(d=>{const s=$('#sl-'+d.id),o=$('#num-'+d.id);if(s)s.value=S.p[d.id];if(o&&o!==skip){o.value=numTxt(d,S.p[d.id]);o.classList.remove('bad')}})}
 function enterBuild(){
   const L=S.level;detenerP5();S.phase='build';S.sim=null;setSteps(1);$('#panel').setAttribute('aria-live','off');$('#hud').hidden=true;cv.style.touchAction='none';
   if(L.free&&!S.famId){S.an=null}
@@ -1452,10 +1464,11 @@ function renderBuild(){
     }else{
       html+=`<div class="eq" id="eq"></div>
        <div class="sliders">${F.params.map((d,i)=>`<div class="sl" style="accent-color:var(--p${i})">
-         <div class="lab"><b class="p${i}">${d.label||d.id}</b><span>${esc(d.role)}</span><output class="p${i}" id="out-${d.id}">${pFmt(d,S.p[d.id])}</output></div>
-         <button type="button" data-d="${d.id}" data-s="-1" aria-label="Bajar ${d.label||d.id}">−</button>
+         <div class="lab"><b class="p${i}">${d.label||d.id}</b><span>${esc(d.role)}</span></div>
+         <button type="button" data-d="${d.id}" data-s="-1" aria-label="Bajar ${d.label||d.id} ${fmt(d.step)}">−</button>
          <input type="range" id="sl-${d.id}" min="${d.min}" max="${d.max}" step="${d.step}" value="${S.p[d.id]}" aria-label="${esc((d.label||d.id)+': '+d.role)}">
-         <button type="button" data-d="${d.id}" data-s="1" aria-label="Subir ${d.label||d.id}">+</button></div>`).join('')}</div>
+         <button type="button" data-d="${d.id}" data-s="1" aria-label="Subir ${d.label||d.id} ${fmt(d.step)}">+</button>
+         <input class="num p${i}" id="num-${d.id}" data-d="${d.id}" type="text" inputmode="${d.format?'text':'decimal'}" autocomplete="off" spellcheck="false" value="${esc(numTxt(d,S.p[d.id]))}" aria-label="Valor exacto de ${esc(d.label||d.id)}${d.format?' (múltiplo de π, por ejemplo π/6)':` (entre ${fmt(d.min)} y ${fmt(d.max)})`}" title="${d.format?'Escribe b como múltiplo de π, por ejemplo π/6':`Escribe un valor entre ${fmt(d.min)} y ${fmt(d.max)}`}"></div>`).join('')}</div>
        <p style="font-size:.9rem;color:var(--muted)">También puedes arrastrar el punto blanco sobre el plano.</p>`;
     }
     html+=`<div><h3>Puntos de control: tu f(x) / meta</h3><ul class="checks" id="checks" style="margin-top:6px"></ul></div>
@@ -1479,8 +1492,17 @@ function renderBuild(){
     if(px)px.onchange=()=>{S.pxMode=px.checked;readFormula(inp.value)};
     readFormula(inp.value);
   }else{
-    F.params.forEach(d=>{const s=$('#sl-'+d.id);s.oninput=()=>{setParam(d.id,+s.value,d);$('#out-'+d.id).textContent=pFmt(d,S.p[d.id]);updateBuild()}});
-    document.querySelectorAll('.sl button').forEach(b=>{b.onclick=()=>{const d=F.params.find(q=>q.id===b.dataset.d);setParam(d.id,S.p[d.id]+d.step*(+b.dataset.s),d);syncSliders();updateBuild()}});
+    F.params.forEach(d=>{
+      const s=$('#sl-'+d.id),n=$('#num-'+d.id);
+      s.oninput=()=>{setParam(d.id,+s.value,d);syncSliders();updateBuild()};
+      /* campo numérico: mientras escribe, el puente sigue el valor (si es válido); al salir o con Enter se normaliza */
+      const fine=d.format?1:.01;
+      n.oninput=()=>{const v=readNum(d,n.value);const ok=Number.isFinite(v)&&v>=d.min-1e-9&&v<=d.max+1e-9;n.classList.toggle('bad',!ok&&n.value.trim()!=='');if(ok){setParam(d.id,v,d,fine);syncSliders(n);updateBuild()}};
+      n.onchange=()=>{const v=readNum(d,n.value);if(Number.isFinite(v)){setParam(d.id,v,d,fine);updateBuild()}syncSliders()};
+      n.onkeydown=e=>{if(e.key==='Enter'){n.onchange();n.select()}};
+    });
+    /* − y +: un paso del deslizador (0.1; 0.01 en los parámetros finos; una fracción π/12 en la frecuencia del seno) */
+    document.querySelectorAll('.sl button').forEach(b=>{b.onclick=()=>{const d=F.params.find(q=>q.id===b.dataset.d);setParam(d.id,S.p[d.id]+d.step*(+b.dataset.s),d,d.format?1:.01);syncSliders();updateBuild()}});
   }
   $('#run-test').onclick=startTest;
   $('#show-hint').onclick=()=>{S.hint=true;renderHint()};
@@ -1514,6 +1536,7 @@ function updateBuild(){
   const over=S.an.cost>L.budget,bt=$('#bud-t'),bm=$('#bud-m');
   if(bt)bt.textContent=`$${S.an.cost.toLocaleString('es-CO')} de $${L.budget.toLocaleString('es-CO')}`;
   if(bm){bm.classList.toggle('over',over);bm.firstElementChild.style.width=clamp(S.an.cost/L.budget*100,0,100)+'%'}
+  refreshSteps();
 }
 function startTest(){
   S.an=analyze(S.level,S.famId,S.p);S.phase='test';setSteps(2);$('#panel').setAttribute('aria-live','polite');cv.style.touchAction='auto';audio();
@@ -1554,7 +1577,7 @@ function onWin(){
     <div class="eq">${FAM[S.famId].eq(S.p,L)}</div>
     ${windHtml(L,S.an)}
     ${analysisHtml(L,S.famId,S.p)}
-    ${L.free?'':`<div class="fb good"><strong>Cómo reconocerla</strong>${esc(cap(FAM[L.fam].shape))}. Dominio: ${esc(FAM[L.fam].dom)}.</div>`}
+    ${L.free?'':`<div class="fb good"><strong>Cómo reconocerla</strong>${esc(cap(L.recog||FAM[L.fam].shape))}. Dominio: ${esc(FAM[L.fam].dom)}.</div>`}
     <div class="row">${nx?`<button class="btn primary grow" id="next-lv" type="button">Siguiente obra</button>`:`<button class="btn primary grow" id="to-exam" type="button">Tomar el examen del inspector</button>`}<button class="btn" id="again" type="button">Repetir</button><button class="btn" id="to-map" type="button">Obras</button></div>`;
   if(nx)$('#next-lv').onclick=()=>startLevel(nx);else $('#to-exam').onclick=()=>startExam();
   $('#again').onclick=()=>startLevel(L);$('#to-map').onclick=goMenu;
@@ -1585,9 +1608,7 @@ function makeQuestion(id){
   let reps=['graph','eq','reverse'];if(F.tableX)reps.push('table','table');
   const rep=pick(reps);
   if(rep==='table'){if(id==='exponencial')p.c=0;if(id==='racional'){p.h=0;p.k=0}}
-  /* A simple vista, una catenaria y una parábola no se distinguen: no compiten en la misma pregunta. */
-  const twin={catenaria:'cuadratica',cuadratica:'catenaria'}[id];
-  const dist=shuffle(FAM_IDS.filter(i=>i!==id&&i!==twin)).slice(0,3);
+  const dist=shuffle(FAM_IDS.filter(i=>i!==id)).slice(0,3);
   const opts=shuffle([id,...dist]).map(o=>({id:o,p:o===id?p:FAM[o].rand()}));
   return{id,p,lvl,rep,opts};
 }
@@ -1607,17 +1628,30 @@ function renderExam(){
     :`<div class="choices">${q.opts.map(o=>`<button class="choice" type="button" data-o="${o.id}">${esc(FAM[o.id].name)}</button>`).join('')}</div>`;
   $('#s-exam').innerHTML=`<div class="bar"><button class="btn small" id="ex-back" type="button">Obras</button><div class="where"><small>Pregunta ${EX.i+1} de ${EX.qs.length} · ${EX.score} ${EX.score===1?'correcta':'correctas'}</small><strong>Examen del inspector</strong></div></div>
     <div class="progress"><i style="width:${EX.i/EX.qs.length*100}%"></i></div>
-    <div class="sheet" aria-live="polite">${prompt}${ops}<div id="ex-fb"></div></div>`;
+    <div class="sheet" aria-live="polite">${prompt}${ops}<div id="ex-fb"></div><div class="row" id="ex-nav" style="margin-top:10px"></div></div>`;
   $('#ex-back').onclick=goMenu;
-  document.querySelectorAll('#s-exam [data-o]').forEach(b=>{b.onclick=()=>{
-    if(EX.answered)return;EX.answered=true;
-    const o=b.dataset.o,ok=o===q.id;
-    document.querySelectorAll('#s-exam [data-o]').forEach(x=>{x.disabled=true;if(x.dataset.o===q.id)x.classList.add('right')});
-    if(ok){EX.score++;sfx.right()}else{b.classList.add('wrong');EX.misses.push(q.id);sfx.wrong()}
+  const lastQ=EX.i===EX.qs.length-1;
+  /* Barra de navegación: «← Anterior» desde la segunda pregunta; «Siguiente» solo cuando esta ya tiene respuesta. */
+  const nav=()=>{
+    $('#ex-nav').innerHTML=(EX.i>0?`<button class="btn" id="ex-prev" type="button" aria-label="Volver a la pregunta anterior">← Anterior</button>`:'')
+      +(q.chosen?`<button class="btn primary" id="ex-next" type="button">${lastQ?'Ver resultado':'Siguiente pregunta'}</button>`:'');
+    if(EX.i>0)$('#ex-prev').onclick=()=>{EX.i--;renderExam();window.scrollTo(0,0)};
+    if(q.chosen)$('#ex-next').onclick=()=>{if(lastQ)finishExam();else{EX.i++;renderExam();window.scrollTo(0,0)}};
+  };
+  /* Marca la respuesta guardada: la correcta en verde y, si se falló, la elegida tachada. Una pregunta respondida no se puede cambiar. */
+  const mark=()=>{
+    const ok=q.chosen===q.id;
+    document.querySelectorAll('#s-exam [data-o]').forEach(x=>{x.disabled=true;if(x.dataset.o===q.id)x.classList.add('right');if(!ok&&x.dataset.o===q.chosen)x.classList.add('wrong')});
     const cue=q.rep==='table'?`En una tabla, ${F.tableCue}.`:q.rep==='eq'?`Su fórmula tiene la forma ${F.form}.`:`${cap(F.shape)}.`;
-    const lastQ=EX.i===EX.qs.length-1;
-    $('#ex-fb').innerHTML=`<div class="fb ${ok?'good':'bad'}"><strong>${ok?'Correcto':'La respuesta es: '+esc(F.name)}</strong>${esc(cue)}</div><div class="row" style="margin-top:10px"><button class="btn primary" id="ex-next" type="button">${lastQ?'Ver resultado':'Siguiente pregunta'}</button></div>`;
-    $('#ex-next').onclick=()=>{if(lastQ)finishExam();else{EX.i++;renderExam();window.scrollTo(0,0)}};
+    $('#ex-fb').innerHTML=`<div class="fb ${ok?'good':'bad'}"><strong>${ok?'Correcto':'La respuesta es: '+esc(F.name)}</strong>${esc(cue)}</div>`;
+    nav();
+  };
+  if(q.chosen){mark();return}
+  nav();
+  document.querySelectorAll('#s-exam [data-o]').forEach(b=>{b.onclick=()=>{
+    if(q.chosen)return;q.chosen=b.dataset.o;
+    if(q.chosen===q.id){EX.score++;sfx.right()}else{EX.misses.push(q.id);sfx.wrong()}
+    mark();
     $('#ex-next').focus({preventScroll:true});
   }});
 }
@@ -1677,6 +1711,7 @@ function openReport(){
 /* ---------- arranque ---------- */
 $('#back-map').onclick=goMenu;
 $('#open-guide').onclick=()=>openGuide('game');
+document.querySelectorAll('#g-steps button').forEach(b=>{b.onclick=()=>goStep(+b.dataset.step)});
 const soundBtn=$('#toggle-sound');
 const paintSound=()=>{soundBtn.textContent=`♪ ${P.sound?'sí':'no'}`;soundBtn.setAttribute('aria-label',P.sound?'Sonido activado':'Sonido desactivado')};paintSound();
 soundBtn.onclick=()=>{P.sound=!P.sound;save();paintSound();if(P.sound)tone(660)};

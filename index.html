@@ -158,7 +158,7 @@
   <div class="dlg-head"><h2 id="opts-t">Opciones</h2><button class="x" type="button" data-close aria-label="Cerrar">✕</button></div>
   <div class="dlg-body">
     <label class="sw"><span><b>Sonido</b><small>Efectos al acertar, al ganar y cuando el puente cae.</small></span><input type="checkbox" id="opt-sound"></label>
-    <label class="sw"><span><b>Modo docente</b><small>Desbloquea las 14 obras para revisarlas en cualquier orden.</small></span><input type="checkbox" id="opt-teacher"></label>
+    <label class="sw"><span><b>Modo docente</b><small>Desbloquea las 13 obras para revisarlas en cualquier orden.</small></span><input type="checkbox" id="opt-teacher"></label>
     <label class="sw"><span><b>Animación del fondo</b><small>Desactívala si prefieres una escena quieta.</small></span><input type="checkbox" id="opt-anim"></label>
     <div class="row"><button class="btn" type="button" id="opt-full">Pantalla completa</button></div>
     <p class="note">Las opciones se guardan en este navegador y las usa también el juego.</p>
@@ -197,8 +197,8 @@
 <script>
 "use strict";
 /* ---------- progreso y opciones: la misma clave que usa el juego ---------- */
-const KEY='puentes-funciones-v1',TOTAL=14;
-const ORDER=['vado','molino','condor','arco','eco','serpiente','ladera','terraza','garganta','olas','viaducto','colgante','viento','maestra'];
+const KEY='puentes-funciones-v1',TOTAL=13;
+const ORDER=['vado','molino','condor','arco','eco','serpiente','ladera','terraza','garganta','olas','viaducto','viento','maestra'];
 let P={levels:{},sound:true,unlockAll:false};
 try{const raw=localStorage.getItem(KEY);if(raw)P={...P,...JSON.parse(raw)}}catch(e){}
 const save=()=>{try{const raw=localStorage.getItem(KEY),cur=raw?JSON.parse(raw):{};localStorage.setItem(KEY,JSON.stringify({...cur,sound:P.sound,unlockAll:P.unlockAll}))}catch(e){}};
