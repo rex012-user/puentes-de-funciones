@@ -196,7 +196,7 @@ textarea{width:100%;min-height:150px;background:var(--sheet);border:1px solid va
 .fx-msg.warn{color:var(--warn)}
 .fx-px{display:flex;gap:.5em;align-items:flex-start;font-size:.9rem;color:var(--muted);cursor:pointer}
 .fx-px input{width:auto;margin-top:.25em;accent-color:var(--tape)}
-/* Panel de análisis y resonancia */
+/* Panel de análisis */
 .analysis{border:1px solid var(--rule);background:rgba(12,40,69,.55)}
 .analysis summary{padding:.5em .75em;font-weight:700;cursor:pointer}
 .analysis summary:focus-visible{outline:3px solid var(--paper);outline-offset:-3px}
@@ -205,10 +205,3 @@ textarea{width:100%;min-height:150px;background:var(--sheet);border:1px solid va
 .analysis dt{font-size:.82rem;color:var(--muted)}
 .analysis dd{margin:0;font:400 1.02rem/1.3 var(--math);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .analysis .note{padding:0 .75em .6em;font-size:.84rem;color:var(--muted)}
-.wind{display:grid;gap:6px;padding:.6em .75em;border-left:4px solid var(--p1);background:rgba(12,40,69,.55);font-size:.94rem}
-.wind.danger{border-color:var(--bad)}
-.wind strong{display:block}
-.wind .plot{max-width:360px}
-.pl-limit{stroke:#FF7B7B;stroke-width:1.5;stroke-dasharray:5 4;fill:none}
-.pl-dot{fill:#FFFFFF;stroke:#0C2845;stroke-width:1.5}
-.pl-text{fill:#AECADC;font:11px var(--body)}

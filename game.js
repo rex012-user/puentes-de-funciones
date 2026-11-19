@@ -335,7 +335,7 @@ const REG={
  costa:{label:'Costa',sky:['#F28F6F','#FFE3AC'],mt:['#B85C7E','#8D4168'],rock:['#5C2E4E','#4A2340','#6E3A5C','#3A1B33','#80476A'],grass:'#E1A24A',tree:['#2F5D5A','#214845'],water:['#214670','#2F6796','#F9BE96'],ink:'#26102C',sun:'#FFF3C0'},
 };
 
-/* ---------- las 13 obras ---------- */
+/* ---------- las 12 obras ---------- */
 const LEVELS=[
  {n:1,id:'vado',name:'El vado',region:'canon',fam:'lineal',rep:'graph',sol:{m:0,b:3},start:{m:.5,b:1},xL:0,xR:12,pillars:[6],obs:[{t:'boat',x:3,y:2}],
   opts:['lineal','absoluto','cuadratica','exponencial'],
@@ -395,12 +395,7 @@ const LEVELS=[
   story:'Una rampa, un tramo plano y una bajada: cada parte sigue su propia regla. Los tramos cambian en x = 4 y en x = 8.',
   why:'No hay una sola fórmula que describa las tres partes. Cada intervalo tiene su propia regla.',
   hint:'Cuida la continuidad: el primer tramo debe valer k en x = 4 y el último también debe valer k en x = 8.'},
- {n:12,id:'viento',name:'Viento del estrecho',region:'costa',fam:'seno',rep:'desc',desc:'“La calzada sale de y = 3, sube y baja con un oleaje regular, vuelve a y = 3 justo en el centro y termina en y = 3 en la otra orilla.”',wind:{omega:Math.PI/6,zeta:.08,base:.1,limit:.35,mode:2},sol:{a:2,n:4,h:0,k:3},start:{a:1,n:2,h:2,k:2},xL:0,xR:12,pillars:[6],obs:[{t:'boat',x:2,y:4}],
-  opts:['seno','cuadratica','cubica','tramos'],
-  story:'El viento del estrecho empuja el puente con una frecuencia fija. Si tu puente vibra con esa misma frecuencia, cada ráfaga aumenta la oscilación.',
-  why:'La ruta se repite con regularidad alrededor de una línea media. Solo una función periódica se comporta así.',
-  hint:'El viento tiene ω = π/6, así que debes evitar b = π/6. El pilar central necesita y = 3 en x = 6: prueba con b = π/3, que da un periodo de 6.'},
- {n:13,id:'maestra',name:'Obra maestra',region:'costa',fam:'exponencial',free:true,sol:{a:6,b:.75,c:1},xL:0,xR:12,pillars:[2,4,7],obs:[],
+ {n:12,id:'maestra',name:'Obra maestra',region:'costa',fam:'exponencial',free:true,sol:{a:6,b:.75,c:1},xL:0,xR:12,pillars:[2,4,7],obs:[],
   story:'Esta vez no hay plano. Solo tienes las orillas y los pilares. Observa cómo se acomodan y elige la función que pasa por todos.',
   why:'La caída se frena poco a poco y se acerca a una altura que nunca alcanza. Esa asíntota horizontal delata a la exponencial.',
   hint:'Mira los pilares: la caída se frena, nunca vuelve a subir y parece acercarse a y = 1. ¿Qué función tiene una asíntota horizontal?'},
@@ -485,48 +480,8 @@ function analyze(L,famId,p){
     add(fx?fx.x:mx,'slope',`Cerca de x = ${fmt(fx?fx.x:mx)} la pendiente llega a ${fmt(fx?fx.s:maxS)}. El camión solo sube con seguridad hasta ${fmt(MAX_SLOPE)}: más empinado, las llantas patinan.`);
   }
   if(runs.length>1)rows.splice(rows.length-1,0,{label:'Puente continuo',ok:cont,val:cont?'sí':'con huecos'});
-  /* resonancia */
-  const wind=windResponse(L,famId,p);
-  if(wind){
-    rows.push({label:'Resonancia con el viento',ok:wind.ok,val:`${fmt(wind.amp)} ≤ ${fmt(L.wind.limit)}`});
-    if(!wind.ok)add(L.xL+(L.xR-L.xL)/4,'resonance',`La frecuencia de tu puente, b ≈ ${fmt(wind.b)}, está muy cerca de la del viento, ω ≈ ${fmt(L.wind.omega)}. La oscilación llega a ${fmt(wind.amp)} y solo se tolera hasta ${fmt(L.wind.limit)}: el puente entra en resonancia.`);
-  }
   issues.sort((a,b)=>a.x-b.x);
-  return{runs,issues,rows,cost,okL,okR,f,wind};
-}
-
-/* ---------- resonancia ----------
-   Oscilador forzado con amortiguamiento: A = A₀ / √((1 − r²)² + (2ζr)²), con r = b / ω.
-   Simplificación del juego: b, la frecuencia de la curva, hace de frecuencia natural del puente. */
-function resonance(w,b){const r=b/w.omega;return w.base/Math.sqrt((1-r*r)**2+(2*w.zeta*r)**2)}
-/* Busca la b con la que y ≈ A·sen(bx) + B·cos(bx) + C se ajusta mejor a la curva. */
-function dominantFreq(L,famId,p){
-  const F=FAM[famId],N=120,xs=[],ys=[];
-  for(let i=0;i<=N;i++){const x=L.xL+(L.xR-L.xL)*i/N,y=F.f(x,p,L);if(Number.isFinite(y)&&Math.abs(y)<30){xs.push(x);ys.push(y)}}
-  if(xs.length<20)return 0;
-  const m=ys.reduce((u,v)=>u+v,0)/ys.length,total=ys.reduce((u,v)=>u+(v-m)**2,0);
-  if(total<1e-6)return 0;
-  const residual=b=>{
-    let ss=0,cc=0,sc=0,s1=0,c1=0,sy=0,cy=0,y1=0;const n=xs.length;
-    xs.forEach((x,i)=>{const s=Math.sin(b*x),c=Math.cos(b*x),y=ys[i]-m;ss+=s*s;cc+=c*c;sc+=s*c;s1+=s;c1+=c;sy+=s*y;cy+=c*y;y1+=y});
-    const det=ss*(cc*n-c1*c1)-sc*(sc*n-c1*s1)+s1*(sc*c1-cc*s1);
-    if(Math.abs(det)<1e-9)return Infinity;
-    const A=(sy*(cc*n-c1*c1)-sc*(cy*n-c1*y1)+s1*(cy*c1-cc*y1))/det;
-    const B=(ss*(cy*n-c1*y1)-sy*(sc*n-c1*s1)+s1*(sc*y1-cy*s1))/det;
-    const C=(ss*(cc*y1-c1*cy)-sc*(sc*y1-c1*sy)+sy*(sc*c1-cc*s1))/det;
-    let r=0;xs.forEach((x,i)=>{r+=(ys[i]-m-A*Math.sin(b*x)-B*Math.cos(b*x)-C)**2});
-    return r;
-  };
-  let best=0,br=Infinity;const step=Math.PI/96;
-  for(let b=Math.PI/24;b<=3.5;b+=step){const r=residual(b);if(r<br-1e-9){br=r;best=b}}
-  let u=best-step,v=best+step;
-  for(let i=0;i<30;i++){const c=v-.618034*(v-u),d=u+.618034*(v-u);if(residual(c)<residual(d))v=d;else u=c}
-  return(u+v)/2;
-}
-function windResponse(L,famId,p){
-  if(!L.wind)return null;
-  const b=famId==='seno'?p.n*Math.PI/12:dominantFreq(L,famId,p),amp=resonance(L.wind,b);
-  return{b,amp,ok:amp<=L.wind.limit};
+  return{runs,issues,rows,cost,okL,okR,f};
 }
 
 /* ---------- análisis matemático para el informe ----------
@@ -644,17 +599,6 @@ function analysisHtml(L,famId,p){
     ${row('Creciente en',m.inc)}${row('Decreciente en',m.dec)}${m.flat?row('Constante en',m.flat):''}${row('Asíntotas',m.asym)}</dl>`;
   return`<details class="analysis" id="analysis" ${S.analysisOpen?'open':''}><summary>Análisis matemático</summary>${body}<p class="note">Valores calculados con la función actual en el tramo [${fmt(L.xL)}, ${fmt(L.xR)}] y redondeados a dos decimales.</p></details>`;
 }
-function windHtml(L,an){
-  const w=L.wind,r=an.wind;if(!w||!r)return'';
-  const W0=320,H0=130,bMax=w.omega*3.5,yMax=.8,px=b=>b/bMax*W0,py=a=>H0-Math.min(a,yMax)/yMax*H0;
-  let d='';for(let i=0;i<=160;i++){const b=bMax*i/160;d+=(i?'L':'M')+px(b).toFixed(1)+' '+py(resonance(w,b)).toFixed(1)}
-  const bx=Math.min(r.b,bMax);
-  return`<div class="wind ${r.ok?'':'danger'}"><strong>${r.ok?'Fuera de resonancia':'Peligro: resonancia'}</strong>
-    <span>Viento: ω ≈ ${fmt(w.omega)}. Tu puente: b ≈ ${fmt(r.b)}. Oscilación: ${fmt(r.amp)} (máximo ${fmt(w.limit)}).</span>
-    <svg class="plot" viewBox="0 0 ${W0} ${H0}" role="img" aria-label="Oscilación del puente según su frecuencia b. El pico está en la frecuencia del viento."><path class="pl-axis" d="M0 ${H0-1}H${W0}"/><path class="pl-limit" d="M0 ${py(w.limit)}H${W0}"/><path class="pl-curve" d="${d}"/><circle class="pl-dot" cx="${px(bx)}" cy="${py(r.amp)}" r="5"/><text class="pl-text" x="${W0-4}" y="${py(w.limit)-5}" text-anchor="end">límite</text></svg>
-    <span style="font-size:.84rem;color:var(--muted)">En este juego, b hace de frecuencia natural del puente: es una simplificación del modelo.</span></div>`;
-}
-
 /* ---------- progreso ---------- */
 const KEY='puentes-funciones-v1';
 let P={name:'',levels:{},examBest:null,unlockAll:false,sound:true};
@@ -791,13 +735,6 @@ function drawPillar(pt,ok,show){
   const col=show?(ok?'#2CCB86':'#FF8F24'):'#D5CFC2';
   poly(ctx,[[cx-hw*1.5,top-.04*SC],[cx+hw*1.5,top-.04*SC],[cx+hw*1.2,top+.16*SC],[cx-hw*1.2,top+.16*SC]],col);
 }
-function drawWind(t){
-  ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=Math.max(1.2,.04*SC);ctx.lineCap='round';
-  for(let i=0;i<12;i++){
-    const len=(.9+(i%3)*.5)*SC,sp=70+(i%4)*28,x=((t*sp+i*137)%(W+len*2))-len,y=H*(.08+.055*i)+Math.sin(t*1.4+i)*5;
-    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+len,y);ctx.stroke();
-  }
-}
 function drawBoat(o,t){
   const sway=REDUCED?0:Math.sin(t*1.1+o.x)*.05,cx=X(o.x),wy=Y(WATER);
   ctx.save();ctx.translate(cx,wy);ctx.rotate(sway*.5);
@@ -899,8 +836,6 @@ function newSim(){const an=S.an,L=S.level;return{t:0,tx:L.xL-3.2,state:'run',iss
 const ground=(x,s)=>{const L=S.level;if(x<=L.xL)return L.yL;if(x>=L.xR)return L.yR;const y=S.an.f(x);return(y===null?L.yR:y)+sag(x,s)};
 function load(x,s){return Math.exp(-(((x-s.tx)/1.5)**2))}
 function sag(x,s){const L=S.level;if(x<=L.xL||x>=L.xR)return 0;const onDeck=s.tx>L.xL-1&&s.tx<L.xR+1;const f=supFactor(x,s.sup);let v=onDeck?-.15*load(x,s)*f:0;if(s.wobT&&!REDUCED){const d=s.t-s.wobT;v+=-.07*f*Math.exp(-d*1.6)*Math.sin(d*9)}
-  const wd=S.an&&S.an.wind;
-  if(wd&&!REDUCED){const grow=wd.ok?1:clamp(.25+s.t*.22,0,1.3);v+=wd.amp*grow*Math.sin(L.wind.mode*Math.PI*(x-L.xL)/(L.xR-L.xL))*Math.sin(s.t*5)}
   return v}
 function stress(x,s){const f=supFactor(x,s.sup);return clamp(.12+f*.3+load(x,s)*f*.5,0,1)}
 function splash(x,n=22){if(REDUCED)n=8;const c=S.level.reg.water[2];for(let i=0;i<n;i++)S.sim.parts.push({x:x+(Math.random()-.5)*.6,y:WATER+.05,vx:(Math.random()-.5)*3.2,vy:1.5+Math.random()*3.6,g:9,life:.9+Math.random()*.5,c,r:2+Math.random()*3})}
@@ -975,7 +910,6 @@ function dibujarEscena(t){
     }
   }
   drawWater(t,true);
-  if(L.wind&&!menu)drawWind(REDUCED?0:t);
   if(sim)sim.parts.forEach(p=>{ctx.fillStyle=p.c;if(p.tri){const a=p.life*5,r=p.r;poly(ctx,[[X(p.x)+Math.cos(a)*r,Y(p.y)+Math.sin(a)*r],[X(p.x)+Math.cos(a+2.1)*r,Y(p.y)+Math.sin(a+2.1)*r],[X(p.x)+Math.cos(a+4.2)*r,Y(p.y)+Math.sin(a+4.2)*r]],p.c)}else{ctx.globalAlpha=clamp(p.life,0,1);ctx.beginPath();ctx.arc(X(p.x),Y(p.y),p.r,0,7);ctx.fill();ctx.globalAlpha=1}});
   /* etiquetas */
   if(building||ident){
@@ -1052,7 +986,7 @@ const PHYS={
   GRAV:.0006,     /* escala de la gravedad de Matter */
 };
 /* Fallas estructurales que ya detecta analyze(): cuando el camión llega ahí, el tablero se suelta y cae. */
-const COLAPSO=new Set(['pillar','boat','cable','anchorL','anchorR','resonance']);
+const COLAPSO=new Set(['pillar','boat','cable','anchorL','anchorR']);
 const toPhys=(x,y,L=S.level)=>({x:PHYS.X0+(x-L.xL)*PHYS.K,y:-y*PHYS.K});
 const fromPhys=(px,py,L=S.level)=>({x:L.xL+(px-PHYS.X0)/PHYS.K,y:-py/PHYS.K});
 
@@ -1209,7 +1143,6 @@ function dibujarPrueba(sk,t,sim){
   vehiculoP5(sk,sim);
   banderaP5(sk,sim);
   aguaP5(sk,t,true);
-  if(L.wind)vientoP5(sk,REDUCED?0:t);
   particulasP5(sk,sim);
 }
 function aguaP5(sk,t,front){
@@ -1299,10 +1232,6 @@ function banderaP5(sk,sim){
   if(sim.flag<=0)return;const L=sim.L,fx=X(L.xR+.45),fy=Y(L.yR);
   sk.noStroke();sk.fill('#232B38');sk.rect(fx-1.5,fy-1.8*SC,3,1.8*SC);
   const up=1.3*SC*sim.flag;pPoly(sk,[[fx+1,fy-up-.5*SC],[fx+.9*SC,fy-up-.25*SC],[fx+1,fy-up]],'#FF8F24');
-}
-function vientoP5(sk,t){
-  sk.stroke(255,153);sk.strokeWeight(Math.max(1.2,.04*SC));sk.strokeCap(sk.ROUND);
-  for(let i=0;i<12;i++){const len=(.9+(i%3)*.5)*SC,sp=70+(i%4)*28,x=((t*sp+i*137)%(W+len*2))-len,y=H*(.08+.055*i)+Math.sin(t*1.4+i)*5;sk.line(x,y,x+len,y)}
 }
 function particulasP5(sk,sim){
   sim.parts.forEach(p=>{
@@ -1451,7 +1380,7 @@ function renderBuild(){
   const L=S.level,F=S.famId?FAM[S.famId]:null,isText=S.famId==='texto';
   const title=L.free?'Elige la pieza':isText?fullName(L.fam):F?fullName(S.famId):'Elige la pieza';
   let html=`<h2>${esc(title)}</h2>`;
-  if(L.free)html+=`<p>${esc(L.story)}</p><div class="chips" id="fam-chips">${FAM_IDS.filter(i=>i!=='tramos').map(i=>`<button class="chip ${i===S.famId||(isText&&i===S.baseFam)?'on':''}" type="button" data-f="${i}">${esc(FAM[i].name)}</button>`).join('')}</div>`;
+  if(L.free)html+=`<p>${esc(L.story)}</p><div class="chips" id="fam-chips">${FAM_IDS.filter(i=>!['tramos','constante'].includes(i)).map(i=>`<button class="chip ${i===S.famId||(isText&&i===S.baseFam)?'on':''}" type="button" data-f="${i}">${esc(FAM[i].name)}</button>`).join('')}</div>`;
   if(F){
     if(S.famId!=='tramos')html+=`<div class="tabs" role="group" aria-label="Forma de definir la función"><button class="tab ${isText?'':'on'}" type="button" id="tab-sl" aria-pressed="${!isText}">Deslizadores</button><button class="tab ${isText?'on':''}" type="button" id="tab-tx" aria-pressed="${isText}">Escribir fórmula</button></div>`;
     else html+=`<p style="font-size:.9rem;color:var(--muted)">Esta función tiene una fórmula por tramo, así que aquí se construye con deslizadores.</p>`;
@@ -1472,7 +1401,6 @@ function renderBuild(){
        <p style="font-size:.9rem;color:var(--muted)">También puedes arrastrar el punto blanco sobre el plano.</p>`;
     }
     html+=`<div><h3>Puntos de control: tu f(x) / meta</h3><ul class="checks" id="checks" style="margin-top:6px"></ul></div>
-     <div id="wind-box"></div>
      <div id="analysis-box"></div>
      <div style="display:grid;gap:4px"><div class="budget"><span>Material</span><span id="bud-t"></span></div><div class="meter" id="bud-m"><i></i></div></div>
      <div id="hint-box"></div>
@@ -1531,7 +1459,6 @@ function updateBuild(){
   const eq=$('#eq');if(eq)eq.innerHTML=FAM[S.famId].eq(S.p,L);
   const rt=$('#run-test');if(rt)rt.disabled=S.famId==='texto'&&(!S.p.fn||S.p.invalid);
   const ab=$('#analysis-box');if(ab){ab.innerHTML=analysisHtml(L,S.famId,S.p);$('#analysis').ontoggle=e=>{S.analysisOpen=e.target.open}}
-  const wb=$('#wind-box');if(wb)wb.innerHTML=windHtml(L,S.an);
   const ch=$('#checks');if(ch)ch.innerHTML=S.an.rows.map(r=>`<li class="${r.ok?'ok':''}"><span class="mk" aria-hidden="true">${r.ok?'✓':'✕'}</span><span>${esc(r.label)}</span><span class="val">${esc(r.val)}</span></li>`).join('');
   const over=S.an.cost>L.budget,bt=$('#bud-t'),bm=$('#bud-m');
   if(bt)bt.textContent=`$${S.an.cost.toLocaleString('es-CO')} de $${L.budget.toLocaleString('es-CO')}`;
@@ -1546,7 +1473,7 @@ function startTest(){
   sim.alGanar=onWin;
   sim.alPerder=onFail;
   S.sim=sim;iniciarP5();
-  $('#panel').innerHTML=`<h2>Prueba de carga</h2><p>El camión es un cuerpo físico: un chasis y dos ruedas con tracción que ruedan sobre ${sim.deck.length} vigas, una cada Δx = ${fmt(PHYS.DX)} (10 px). Mira los colores de la calzada: verde significa poca tensión, amarillo media y rojo mucha.</p><div class="eq">${FAM[S.famId].eq(S.p,S.level)}</div>${windHtml(S.level,S.an)}`;
+  $('#panel').innerHTML=`<h2>Prueba de carga</h2><p>El camión es un cuerpo físico: un chasis y dos ruedas con tracción que ruedan sobre ${sim.deck.length} vigas, una cada Δx = ${fmt(PHYS.DX)} (10 px). Mira los colores de la calzada: verde significa poca tensión, amarillo media y rojo mucha.</p><div class="eq">${FAM[S.famId].eq(S.p,S.level)}</div>`;
   if(window.innerWidth<=900)window.scrollTo({top:0,behavior:REDUCED?'auto':'smooth'});
 }
 function onFail(){
@@ -1575,7 +1502,6 @@ function onWin(){
       <li><span class="${clean&&inBudget?'y':'n'}">${clean&&inBudget?'✓':'–'}</span><span>Sin colapsos y dentro del presupuesto${clean&&inBudget?'':` (${S.crashes} ${S.crashes===1?'colapso':'colapsos'}, material $${S.an.cost.toLocaleString('es-CO')})`}</span></li>
     </ul>${free}
     <div class="eq">${FAM[S.famId].eq(S.p,L)}</div>
-    ${windHtml(L,S.an)}
     ${analysisHtml(L,S.famId,S.p)}
     ${L.free?'':`<div class="fb good"><strong>Cómo reconocerla</strong>${esc(cap(L.recog||FAM[L.fam].shape))}. Dominio: ${esc(FAM[L.fam].dom)}.</div>`}
     <div class="row">${nx?`<button class="btn primary grow" id="next-lv" type="button">Siguiente obra</button>`:`<button class="btn primary grow" id="to-exam" type="button">Tomar el examen del inspector</button>`}<button class="btn" id="again" type="button">Repetir</button><button class="btn" id="to-map" type="button">Obras</button></div>`;
